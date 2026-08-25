@@ -51,6 +51,7 @@
         const shipping = voucherUsed ? 0 : shippingFee;
         const total = finalTotal + shipping;
 
+        // Update elemen harga
         const priceOriginal = document.getElementById('price-original');
         const priceDiscount = document.getElementById('price-discount');
         const qtyDisplay = document.getElementById('qty-display');
@@ -92,12 +93,14 @@
                 const data = result.data;
                 productPrice = data.productPrice || CONFIG.HARGA_PER_PCS;
                 shippingFee = data.freeShippingDisplayValue || CONFIG.ONGKIR;
-                document.getElementById('product-name').textContent = data.productName || 'Spray Tidur';
-                document.getElementById('product-desc').textContent = data.productDescription || 'Spray tidur - BPOM HALAL, aman tidak berbahaya';
+                const nameEl = document.getElementById('product-name');
+                const descEl = document.getElementById('product-desc');
+                if (nameEl) nameEl.textContent = data.productName || 'Spray Tidur';
+                if (descEl) descEl.textContent = data.productDescription || 'Spray tidur - BPOM HALAL, aman tidak berbahaya';
                 updatePriceDisplay();
             }
         } catch (err) {
-            console.warn('Gagal load config dari backend, pakai default:', err);
+            console.warn('Gagal load config:', err);
         }
     }
 
@@ -123,6 +126,7 @@
 
             try {
                 const url = `${CONFIG.GS_API_URL}?action=address-search&keyword=${encodeURIComponent(keyword)}`;
+                console.log('Fetching:', url);
                 const response = await fetch(url);
                 const json = await response.json();
 
@@ -265,17 +269,14 @@
                 return;
             }
 
-            const orderId = result.orderId;
-            const resi = result.resi || '-';
-
             currentOrderData = {
-                orderId: orderId,
+                orderId: result.orderId,
                 nama: nama,
                 noHp: noHp,
                 totalHarga: total,
                 kurir: courierMethod,
                 metodeBayar: paymentMethod,
-                resi: resi,
+                resi: result.resi || '-',
                 isCOD: isCOD,
             };
 
@@ -452,8 +453,7 @@
 
     // ===== COUNTDOWN =====
     function startCountdown() {
-        let totalSeconds = 1800; // 30 menit
-
+        let totalSeconds = 1800;
         function updateTimer() {
             if (totalSeconds <= 0) totalSeconds = 1800;
             const m = Math.floor(totalSeconds / 60);
@@ -464,7 +464,6 @@
             }
             totalSeconds--;
         }
-
         updateTimer();
         setInterval(updateTimer, 1000);
     }
@@ -534,7 +533,6 @@
 
         const trustMessages = ['🔥 Stok Terbatas!', '💰 Garansi Uang Kembali 100%', '⭐ Ulasan 4.9/5', '📦 Pengiriman Cepat!', '✅ 100% Produk Asli'];
         let trustIndex = 0;
-
         function showTrustPopup() {
             const popup = document.getElementById('trust-popup');
             const content = document.getElementById('trust-content');
@@ -546,17 +544,18 @@
                 trustIndex++;
             }
         }
-
         setInterval(showTrustPopup, 10000);
         setTimeout(showTrustPopup, 3000);
     }
 
-    // ===== INIT =====
+    // ===== DOMContentLoaded =====
     document.addEventListener('DOMContentLoaded', function() {
         loadConfig();
 
+        // QTY
         const btnMinus = document.getElementById('btn-minus');
         const btnPlus = document.getElementById('btn-plus');
+
         if (btnMinus) {
             btnMinus.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -567,6 +566,7 @@
                 }
             });
         }
+
         if (btnPlus) {
             btnPlus.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -580,6 +580,7 @@
             });
         }
 
+        // VOUCHER
         const voucherBtn = document.getElementById('btn-voucher');
         if (voucherBtn) {
             voucherBtn.addEventListener('click', function(e) {
@@ -596,11 +597,18 @@
             });
         }
 
+        // SUBMIT ORDER
         const btnCheckout1 = document.getElementById('btn-checkout');
         const btnCheckout2 = document.getElementById('btn-checkout-footer');
-        if (btnCheckout1) btnCheckout1.addEventListener('click', handleCheckout);
-        if (btnCheckout2) btnCheckout2.addEventListener('click', handleCheckout);
 
+        if (btnCheckout1) {
+            btnCheckout1.addEventListener('click', handleCheckout);
+        }
+        if (btnCheckout2) {
+            btnCheckout2.addEventListener('click', handleCheckout);
+        }
+
+        // TRACKING HEADER
         const btnTrackHeader = document.getElementById('btn-track-header');
         if (btnTrackHeader) {
             btnTrackHeader.addEventListener('click', function() {
@@ -608,11 +616,13 @@
             });
         }
 
+        // TRACKING SUBMIT (di landing page)
         const btnTrackSubmit = document.getElementById('btn-track-submit');
         if (btnTrackSubmit) {
             btnTrackSubmit.addEventListener('click', handleTracking);
         }
 
+        // BACK BUTTONS
         const btnBackHome = document.getElementById('btn-back-home');
         if (btnBackHome) btnBackHome.addEventListener('click', function() { showSection('landing'); });
 
