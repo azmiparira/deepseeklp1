@@ -570,54 +570,54 @@ body {
     margin-bottom: 12px;
 }
 .tracking-progress {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 12px 0;
-  position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 12px 0;
+    position: relative;
 }
 .tracking-progress::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 12%;
-  right: 12%;
-  height: 3px;
-  background: #ddd;
-  z-index: 0;
-  transform: translateY(-50%);
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 12%;
+    right: 12%;
+    height: 3px;
+    background: #ddd;
+    z-index: 0;
+    transform: translateY(-50%);
 }
 .tracking-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 1;
-  background: white;
-  padding: 0 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 1;
+    background: white;
+    padding: 0 4px;
 }
 .tracking-step .step-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #ddd;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 14px;
-  transition: 0.3s;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    transition: 0.3s;
 }
 .tracking-step.done .step-icon {
-  background: #4CAF50;
+    background: #4CAF50;
 }
 .tracking-step .step-label {
-  font-size: 10px;
-  margin-top: 4px;
-  color: #666;
+    font-size: 10px;
+    margin-top: 4px;
+    color: #666;
 }
 .tracking-step.done .step-label {
-  font-weight: 600;
-  color: #1a1a1a;
+    font-weight: 600;
+    color: #1a1a1a;
 }
 
 /* ===== NOTIFIKASI ===== */
