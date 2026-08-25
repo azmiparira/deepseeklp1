@@ -49,8 +49,8 @@
                 <div class="product-image-placeholder">
                     <img src="./assets/img/product.jpg" alt="Spray Tidur" id="product-image" />
                 </div>
-                <h1 class="product-title">SPRAY TIDUR - 100% BPOM RI & HALAL</h1>
-                <p class="product-sub">Spray tidur - BPOM HALAL, aman tidak berbahaya</p>
+                <h1 class="product-title" id="product-name">SPRAY TIDUR - 100% BPOM RI & HALAL</h1>
+                <p class="product-sub" id="product-desc">Spray tidur - BPOM HALAL, aman tidak berbahaya</p>
 
                 <!-- Kelebihan Produk (6 ceklis - 3 kiri 3 kanan) -->
                 <div class="product-benefits">
@@ -110,14 +110,13 @@
                     <input type="hidden" id="provinsi" />
                     <input type="hidden" id="kabupaten" />
                     <input type="hidden" id="kecamatan" />
-                    <!-- HIDDEN INPUT UNTUK DESTINATION ADDRESS ID (FIX) -->
                     <input type="hidden" id="destination-address-id" />
 
                     <textarea id="alamat-lengkap" rows="2" placeholder="Alamat lengkap (Jalan, RT/RW, dll)" required></textarea>
                 </form>
             </div>
 
-            <!-- Metode Pembayaran (1 baris 1 pilihan) -->
+            <!-- Metode Pembayaran -->
             <div class="payment-section">
                 <h3>Metode Pembayaran:</h3>
                 <div class="payment-list">
@@ -133,7 +132,7 @@
                 </div>
             </div>
 
-            <!-- Pilihan Kurir (1 baris 1 pilihan) -->
+            <!-- Pilihan Kurir -->
             <div class="courier-section">
                 <h3>Pilih Kurir:</h3>
                 <div class="courier-list">
@@ -157,7 +156,6 @@
             <!-- Testimoni -->
             <div class="testimonial-section">
                 <h3>Testimoni:</h3>
-                <!-- Testimoni 1 (dengan gambar) -->
                 <div class="testimonial-card">
                     <div class="testi-header">
                         <div class="testi-left">
@@ -169,7 +167,6 @@
                     <div class="testi-product-photo"><img src="./assets/img/testi-produk1.jpg" alt="Foto Produk" /></div>
                     <p class="testi-text">Mantap barang dah sampe dengan aman min packing tebel.. semalem nyoba semprot di bantal pas anak lagi rewel susah tidur, eh selang bentar langsung anteng terus pules dong wkwk wangi aromaterapinya calming bgt ga menyengat. rekomended bgt buat emak2 yg anaknya susah tidur</p>
                 </div>
-                <!-- Testimoni 2 (dengan gambar) -->
                 <div class="testimonial-card">
                     <div class="testi-header">
                         <div class="testi-left">
@@ -181,7 +178,6 @@
                     <div class="testi-product-photo"><img src="./assets/img/testi-produk2.jpg" alt="Foto Produk" /></div>
                     <p class="testi-text">Bagus banget! Aroma nya menenangkan, langsung tidur nyenyak. Udah beli 3 kali dan selalu puas. Cepat dikirim, packing aman. Recommended!</p>
                 </div>
-                <!-- Testimoni 3 (dengan gambar) -->
                 <div class="testimonial-card">
                     <div class="testi-header">
                         <div class="testi-left">
@@ -193,7 +189,6 @@
                     <div class="testi-product-photo"><img src="./assets/img/testi-produk3.jpg" alt="Foto Produk" /></div>
                     <p class="testi-text">Anak saya jadi gampang tidur, ga rewel lagi. Wanginya juga ga nyengat, bikin kamar jadi adem. Pengiriman cepat, puas banget!</p>
                 </div>
-                <!-- Testimoni 4 (tanpa gambar) -->
                 <div class="testimonial-card no-avatar">
                     <div class="testi-header">
                         <div class="testi-left">
@@ -204,7 +199,6 @@
                     </div>
                     <p class="testi-text">Produk asli BPOM, aman. Wangi nya calming, bikin tidur lebih nyenyak. Langsung order lagi buat stok. Mantap!</p>
                 </div>
-                <!-- Testimoni 5 (tanpa gambar) -->
                 <div class="testimonial-card no-avatar">
                     <div class="testi-header">
                         <div class="testi-left">
@@ -288,7 +282,7 @@
     </footer>
 
     <script>
-        // GANTI DENGAN URL APPS SCRIPT HASIL DEPLOY TERBARU
+        // GANTI DENGAN URL APPS SCRIPT TERBARU
         window.GS_API_URL = 'https://script.google.com/macros/s/AKfycbzs2sIrux8crIhssdzUbTbbFp1hzpZlc6U_V2XkbgoYuszlXN730E4IbSSNwULiDYVe/exec';
     </script>
     <script src="./assets/js/app.js"></script>
