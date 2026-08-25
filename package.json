@@ -1,0 +1,11 @@
+{
+  "name": "spray-tidur-landing",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Landing page Spray Tidur - backend Google Apps Script, frontend Vercel",
+  "scripts": {
+    "build": "echo 'Tidak ada build step'"
+  },
+  "author": "azmiparira",
+  "license": "MIT"
+}
