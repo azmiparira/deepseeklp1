@@ -8,7 +8,7 @@
     'use strict';
 
     // ===== KONFIGURASI =====
-    var CONFIG = {
+    const CONFIG = {
         GS_API_URL: window.GS_API_URL || 'https://script.google.com/macros/s/AKfycbzs2sIrux8crIhssdzUbTbbFp1hzpZlc6U_V2XkbgoYuszlXN730E4IbSSNwULiDYVe/exec',
         WA_ADMIN: '6281932696934',
         HARGA_PER_PCS: 209000,
@@ -17,7 +17,7 @@
     };
 
     // ===== DOM REFS =====
-    var sections = {
+    const sections = {
         landing: document.getElementById('section-landing'),
         payment: document.getElementById('section-payment'),
         packed: document.getElementById('section-packed'),
@@ -25,40 +25,40 @@
     };
 
     // ===== STATE =====
-    var currentQty = 1;
-    var shippingFee = CONFIG.ONGKIR;
-    var voucherUsed = false;
-    var currentOrderData = null;
-    var productPrice = CONFIG.HARGA_PER_PCS;
+    let currentQty = 1;
+    let shippingFee = CONFIG.ONGKIR;
+    let voucherUsed = false;
+    let currentOrderData = null;
+    let productPrice = CONFIG.HARGA_PER_PCS;
 
     // ===== FUNGSI HARGA =====
     function getDiscountedPrice(qty) {
-        var disc = 0;
+        let disc = 0;
         if (qty === 1) disc = 0;
         else if (qty === 2) disc = 10;
         else if (qty === 3) disc = 12;
         else if (qty === 4) disc = 14;
         else if (qty >= 5) disc = 15;
-        var price = productPrice;
-        var total = price * qty;
+        const price = productPrice;
+        const total = price * qty;
         return Math.round(total - (total * disc / 100));
     }
 
     function updatePriceDisplay() {
-        var qty = currentQty;
-        var originalTotal = productPrice * qty;
-        var finalTotal = getDiscountedPrice(qty);
-        var shipping = voucherUsed ? 0 : shippingFee;
-        var total = finalTotal + shipping;
+        const qty = currentQty;
+        const originalTotal = productPrice * qty;
+        const finalTotal = getDiscountedPrice(qty);
+        const shipping = voucherUsed ? 0 : shippingFee;
+        const total = finalTotal + shipping;
 
-        var priceOriginal = document.getElementById('price-original');
-        var priceDiscount = document.getElementById('price-discount');
-        var qtyDisplay = document.getElementById('qty-display');
-        var summarySubtotal = document.getElementById('summary-subtotal');
-        var summaryShipping = document.getElementById('summary-shipping');
-        var summaryTotal = document.getElementById('summary-total');
-        var footerOriginal = document.getElementById('footer-original');
-        var footerDiscount = document.getElementById('footer-discount');
+        const priceOriginal = document.getElementById('price-original');
+        const priceDiscount = document.getElementById('price-discount');
+        const qtyDisplay = document.getElementById('qty-display');
+        const summarySubtotal = document.getElementById('summary-subtotal');
+        const summaryShipping = document.getElementById('summary-shipping');
+        const summaryTotal = document.getElementById('summary-total');
+        const footerOriginal = document.getElementById('footer-original');
+        const footerDiscount = document.getElementById('footer-discount');
 
         if (priceOriginal) priceOriginal.textContent = 'Rp ' + originalTotal.toLocaleString();
         if (priceDiscount) priceDiscount.textContent = 'Rp ' + finalTotal.toLocaleString();
@@ -71,8 +71,8 @@
         if (footerOriginal) footerOriginal.textContent = 'Rp ' + originalTotal.toLocaleString();
         if (footerDiscount) footerDiscount.textContent = 'Rp ' + total.toLocaleString();
 
-        var stickyPrice = document.getElementById('sticky-price');
-        var stickyStrike = document.getElementById('sticky-strike');
+        const stickyPrice = document.getElementById('sticky-price');
+        const stickyStrike = document.getElementById('sticky-strike');
         if (stickyPrice) stickyPrice.textContent = 'Rp ' + total.toLocaleString();
         if (stickyStrike) {
             if (originalTotal > finalTotal) {
@@ -84,20 +84,17 @@
         }
     }
 
-    // ===== LOAD CONFIG =====
+    // ===== LOAD CONFIG DARI BACKEND =====
     async function loadConfig() {
         try {
-            var url = CONFIG.GS_API_URL + '?action=config';
-            console.log('Loading config from:', url);
-            var response = await fetch(url);
-            var result = await response.json();
-            console.log('Config result:', result);
+            const response = await fetch(`${CONFIG.GS_API_URL}?action=config`);
+            const result = await response.json();
             if (result.success && result.data) {
-                var data = result.data;
+                const data = result.data;
                 productPrice = data.productPrice || CONFIG.HARGA_PER_PCS;
                 shippingFee = data.freeShippingDisplayValue || CONFIG.ONGKIR;
-                var nameEl = document.getElementById('product-name');
-                var descEl = document.getElementById('product-desc');
+                const nameEl = document.getElementById('product-name');
+                const descEl = document.getElementById('product-desc');
                 if (nameEl) nameEl.textContent = data.productName || 'Spray Tidur';
                 if (descEl) descEl.textContent = data.productDescription || 'Spray tidur - BPOM HALAL, aman tidak berbahaya';
                 updatePriceDisplay();
@@ -107,20 +104,22 @@
         }
     }
 
-    // ===== SEARCH KECAMATAN =====
+    // ===== SEARCH KECAMATAN (FIX dengan debug) =====
     function initSearchKecamatan() {
-        var searchInput = document.getElementById('kecamatan-search');
-        var resultsDiv = document.getElementById('kecamatan-results');
+        const searchInput = document.getElementById('kecamatan-search');
+        const resultsDiv = document.getElementById('kecamatan-results');
 
         if (!searchInput || !resultsDiv) {
-            console.warn('Search elements not found');
+            console.warn('⚠️ Search elements not found!');
             return;
         }
 
         resultsDiv.classList.remove('active');
 
         searchInput.addEventListener('input', async function() {
-            var keyword = this.value.trim();
+            const keyword = this.value.trim();
+            console.log('🔍 Keyword typed:', keyword);
+
             if (keyword.length < 2) {
                 resultsDiv.innerHTML = '';
                 resultsDiv.classList.remove('active');
@@ -128,32 +127,42 @@
             }
 
             try {
-                var url = CONFIG.GS_API_URL + '?action=address-search&keyword=' + encodeURIComponent(keyword);
-                console.log('Searching address:', url);
-                var response = await fetch(url);
-                var json = await response.json();
-                console.log('Search result:', json);
+                const url = `${CONFIG.GS_API_URL}?action=address-search&keyword=${encodeURIComponent(keyword)}`;
+                console.log('🌐 Fetching:', url);
+
+                const response = await fetch(url);
+                console.log('📡 Response status:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const json = await response.json();
+                console.log('📦 Response data:', json);
 
                 if (json.success && json.data && json.data.length > 0) {
                     resultsDiv.innerHTML = '';
-                    var seen = new Set();
-                    json.data.forEach(function(item) {
-                        var label = item.DISTRICT_NAME;
+                    const seen = new Set();
+                    json.data.forEach(item => {
+                        const label = item.DISTRICT_NAME;
                         if (label && !seen.has(label)) {
                             seen.add(label);
-                            var div = document.createElement('div');
+                            const div = document.createElement('div');
                             div.className = 'search-result-item';
-                            div.innerHTML = '<div><strong>' + label + '</strong></div><div class="result-detail">' + (item.CITY_NAME || '') + ', ' + (item.PROVINCE_NAME || '') + ' — ' + (item.ZIP_CODE || '') + '</div>';
+                            div.innerHTML = `
+                                <div><strong>${label}</strong></div>
+                                <div class="result-detail">${item.CITY_NAME || ''}, ${item.PROVINCE_NAME || ''} — ${item.ZIP_CODE || ''}</div>
+                            `;
                             div.dataset.provinsi = item.PROVINCE_NAME || '';
                             div.dataset.kabupaten = item.CITY_NAME || '';
                             div.dataset.kecamatan = label;
                             div.dataset.destinationId = item._id || '';
                             div.addEventListener('click', function(e) {
                                 e.stopPropagation();
-                                var provinsiInput = document.getElementById('provinsi');
-                                var kabupatenInput = document.getElementById('kabupaten');
-                                var kecamatanInput = document.getElementById('kecamatan');
-                                var destIdInput = document.getElementById('destination-address-id');
+                                const provinsiInput = document.getElementById('provinsi');
+                                const kabupatenInput = document.getElementById('kabupaten');
+                                const kecamatanInput = document.getElementById('kecamatan');
+                                const destIdInput = document.getElementById('destination-address-id');
                                 if (provinsiInput) provinsiInput.value = this.dataset.provinsi;
                                 if (kabupatenInput) kabupatenInput.value = this.dataset.kabupaten;
                                 if (kecamatanInput) kecamatanInput.value = this.dataset.kecamatan;
@@ -161,14 +170,16 @@
                                 searchInput.value = this.dataset.kecamatan;
                                 resultsDiv.innerHTML = '';
                                 resultsDiv.classList.remove('active');
-                                var errArea = document.getElementById('err-area');
+                                const errArea = document.getElementById('err-area');
                                 if (errArea) errArea.classList.remove('show');
                             });
                             resultsDiv.appendChild(div);
                         }
                     });
+
                     if (resultsDiv.children.length > 0) {
                         resultsDiv.classList.add('active');
+                        console.log('✅ Results shown:', resultsDiv.children.length);
                     } else {
                         resultsDiv.innerHTML = '<div class="search-result-item" style="color:#999;">Tidak ditemukan</div>';
                         resultsDiv.classList.add('active');
@@ -176,10 +187,11 @@
                 } else {
                     resultsDiv.innerHTML = '<div class="search-result-item" style="color:#999;">Tidak ditemukan</div>';
                     resultsDiv.classList.add('active');
+                    console.warn('⚠️ No results from API');
                 }
             } catch (err) {
-                console.error('Error search kecamatan:', err);
-                resultsDiv.innerHTML = '<div class="search-result-item" style="color:red;">Error: ' + err.message + '</div>';
+                console.error('❌ Error search kecamatan:', err);
+                resultsDiv.innerHTML = `<div class="search-result-item" style="color:red;">Error: ${err.message}</div>`;
                 resultsDiv.classList.add('active');
             }
         });
@@ -189,17 +201,99 @@
                 resultsDiv.classList.remove('active');
             }
         });
-
-        searchInput.addEventListener('blur', function() {
-            setTimeout(function() {
-                resultsDiv.classList.remove('active');
-            }, 200);
-        });
     }
+
+    // ===== QTY CONTROL =====
+    document.addEventListener('DOMContentLoaded', function() {
+        loadConfig();
+
+        const btnMinus = document.getElementById('btn-minus');
+        const btnPlus = document.getElementById('btn-plus');
+
+        if (btnMinus) {
+            btnMinus.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (currentQty > 1) {
+                    currentQty--;
+                    updatePriceDisplay();
+                }
+            });
+        }
+
+        if (btnPlus) {
+            btnPlus.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (currentQty < 5) {
+                    currentQty++;
+                    updatePriceDisplay();
+                } else {
+                    alert('Maksimal pembelian 5 pcs');
+                }
+            });
+        }
+
+        const voucherBtn = document.getElementById('btn-voucher');
+        if (voucherBtn) {
+            voucherBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                voucherUsed = !voucherUsed;
+                if (voucherUsed) {
+                    this.classList.add('used');
+                    this.innerHTML = '<i class="fas fa-check-circle"></i> Voucher Digunakan';
+                } else {
+                    this.classList.remove('used');
+                    this.innerHTML = '<i class="fas fa-ticket-alt"></i> Gunakan Voucher Gratis Ongkir';
+                }
+                updatePriceDisplay();
+            });
+        }
+
+        const btnCheckout1 = document.getElementById('btn-checkout');
+        const btnCheckout2 = document.getElementById('btn-checkout-footer');
+        if (btnCheckout1) btnCheckout1.addEventListener('click', handleCheckout);
+        if (btnCheckout2) btnCheckout2.addEventListener('click', handleCheckout);
+
+        const btnTrackHeader = document.getElementById('btn-track-header');
+        if (btnTrackHeader) {
+            btnTrackHeader.addEventListener('click', function() {
+                window.location.href = './tracking.html';
+            });
+        }
+
+        const btnTrackSubmit = document.getElementById('btn-track-submit');
+        if (btnTrackSubmit) {
+            btnTrackSubmit.addEventListener('click', handleTracking);
+        }
+
+        const btnBackHome = document.getElementById('btn-back-home');
+        if (btnBackHome) btnBackHome.addEventListener('click', function() { showSection('landing'); });
+
+        const btnBackHomePacked = document.getElementById('btn-back-home-packed');
+        if (btnBackHomePacked) btnBackHomePacked.addEventListener('click', function() { showSection('landing'); });
+
+        const btnBackHomeTrack = document.getElementById('btn-back-home-track');
+        if (btnBackHomeTrack) btnBackHomeTrack.addEventListener('click', function() { showSection('landing'); });
+
+        const btnHome = document.getElementById('btn-home');
+        if (btnHome) {
+            btnHome.addEventListener('click', function(e) {
+                e.preventDefault();
+                showSection('landing');
+            });
+        }
+
+        initSearchKecamatan();
+
+        updatePriceDisplay();
+        startCountdown();
+        startGimmicks();
+    });
 
     // ===== SHOW SECTION =====
     function showSection(id) {
-        Object.keys(sections).forEach(function(key) {
+        Object.keys(sections).forEach(key => {
             if (sections[key]) {
                 sections[key].classList.toggle('active', key === id);
             }
@@ -209,23 +303,23 @@
 
     // ===== HANDLE CHECKOUT =====
     async function handleCheckout() {
-        var nama = document.getElementById('full-name').value.trim();
-        var noHp = document.getElementById('phone').value.trim();
-        var provinsi = document.getElementById('provinsi').value;
-        var kabupaten = document.getElementById('kabupaten').value;
-        var kecamatan = document.getElementById('kecamatan').value;
-        var alamat = document.getElementById('alamat-lengkap').value.trim();
-        var destId = document.getElementById('destination-address-id')?.value || '';
-        var payment = document.querySelector('input[name="payment"]:checked');
-        var courier = document.querySelector('input[name="courier"]:checked');
+        const nama = document.getElementById('full-name').value.trim();
+        const noHp = document.getElementById('phone').value.trim();
+        const provinsi = document.getElementById('provinsi').value;
+        const kabupaten = document.getElementById('kabupaten').value;
+        const kecamatan = document.getElementById('kecamatan').value;
+        const alamat = document.getElementById('alamat-lengkap').value.trim();
+        const destId = document.getElementById('destination-address-id')?.value || '';
+        const payment = document.querySelector('input[name="payment"]:checked');
+        const courier = document.querySelector('input[name="courier"]:checked');
 
         if (!payment || !courier) {
             alert('Pilih metode pembayaran dan kurir!');
             return;
         }
 
-        var paymentMethod = payment.value;
-        var courierMethod = courier.value;
+        const paymentMethod = payment.value;
+        const courierMethod = courier.value;
 
         if (!nama) {
             alert('Nama lengkap wajib diisi!');
@@ -240,17 +334,17 @@
             return;
         }
 
-        var qty = currentQty;
-        var subtotal = getDiscountedPrice(qty);
-        var shipping = voucherUsed ? 0 : shippingFee;
-        var total = subtotal + shipping;
-        var isCOD = (paymentMethod === 'COD');
-        var weight = CONFIG.BERAT_PER_PCS * qty;
+        const qty = currentQty;
+        const subtotal = getDiscountedPrice(qty);
+        const shipping = voucherUsed ? 0 : shippingFee;
+        const total = subtotal + shipping;
+        const isCOD = (paymentMethod === 'COD');
+        const weight = CONFIG.BERAT_PER_PCS * qty;
 
-        var resi = null;
-        var orderId = null;
+        let resi = null;
+        let orderId = null;
         try {
-            var payload = {
+            const payload = {
                 customerName: nama,
                 customerPhone: noHp,
                 province: provinsi,
@@ -265,12 +359,12 @@
                 paymentChannel: isCOD ? null : paymentMethod,
             };
 
-            var response = await fetch(CONFIG.GS_API_URL + '?action=create-order', {
+            const response = await fetch(`${CONFIG.GS_API_URL}?action=create-order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
-            var result = await response.json();
+            const result = await response.json();
 
             if (!result.success) {
                 alert('Gagal buat order: ' + (result.message || 'Unknown error'));
@@ -308,52 +402,52 @@
     // ===== SHOW PAYMENT PAGE =====
     function showPaymentPage(cashiResp, orderData) {
         showSection('payment');
-        var instr = document.getElementById('payment-instruction');
-        var statusDiv = document.getElementById('payment-status');
-        var waBtn = document.getElementById('btn-wa-payment');
+        const instr = document.getElementById('payment-instruction');
+        const statusDiv = document.getElementById('payment-status');
+        const waBtn = document.getElementById('btn-wa-payment');
 
-        var html = '<p><strong>Total:</strong> Rp ' + orderData.totalHarga.toLocaleString() + '</p>';
-        html += '<p><strong>Order ID:</strong> ' + orderData.orderId + '</p>';
+        let html = `<p><strong>Total:</strong> Rp ${orderData.totalHarga.toLocaleString()}</p>`;
+        html += `<p><strong>Order ID:</strong> ${orderData.orderId}</p>`;
         if (cashiResp.qrUrl) {
-            html += '<p>Scan QRIS:</p><img src="' + cashiResp.qrUrl + '" style="max-width:200px;display:block;margin:10px auto;border-radius:10px;"/>';
+            html += `<p>Scan QRIS:</p><img src="${cashiResp.qrUrl}" style="max-width:200px;display:block;margin:10px auto;border-radius:10px;"/>`;
         } else if (cashiResp.va_number) {
-            html += '<p><strong>Virtual Account:</strong> ' + cashiResp.va_number + '</p><p><strong>Bank:</strong> ' + (cashiResp.bank_name || cashiResp.bank) + '</p>';
+            html += `<p><strong>Virtual Account:</strong> ${cashiResp.va_number}</p><p><strong>Bank:</strong> ${cashiResp.bank_name || cashiResp.bank}</p>`;
         } else if (cashiResp.payment_code) {
-            html += '<p><strong>Kode Pembayaran:</strong> ' + cashiResp.payment_code + '</p><p><strong>Retail:</strong> ' + (cashiResp.retail_name || cashiResp.retail_code) + '</p>';
+            html += `<p><strong>Kode Pembayaran:</strong> ${cashiResp.payment_code}</p><p><strong>Retail:</strong> ${cashiResp.retail_name || cashiResp.retail_code}</p>`;
         } else {
-            html += '<pre>' + JSON.stringify(cashiResp, null, 2) + '</pre>';
+            html += `<pre>${JSON.stringify(cashiResp, null, 2)}</pre>`;
         }
         if (instr) instr.innerHTML = html;
         if (statusDiv) {
-            statusDiv.innerHTML = '<p>Menunggu pembayaran... (auto-check setiap 5 detik)</p><div class="spinner"></div>';
+            statusDiv.innerHTML = `<p>Menunggu pembayaran... (auto-check setiap 5 detik)</p><div class="spinner"></div>`;
         }
         if (waBtn) waBtn.style.display = 'none';
 
-        var pollCount = 0;
-        var interval = setInterval(async function() {
+        let pollCount = 0;
+        const interval = setInterval(async () => {
             pollCount++;
             try {
-                var response = await fetch(CONFIG.GS_API_URL + '?action=check-status&orderId=' + encodeURIComponent(orderData.orderId));
-                var result = await response.json();
+                const response = await fetch(`${CONFIG.GS_API_URL}?action=check-status&orderId=${orderData.orderId}`);
+                const result = await response.json();
                 if (result.success && result.paymentStatus === 'PAID') {
                     clearInterval(interval);
                     if (statusDiv) {
-                        statusDiv.innerHTML = '<p style="color:#25D366;font-weight:bold;">✅ Pembayaran berhasil!</p>';
+                        statusDiv.innerHTML = `<p style="color:#25D366;font-weight:bold;">✅ Pembayaran berhasil!</p>`;
                     }
                     if (waBtn) {
                         waBtn.style.display = 'inline-block';
-                        waBtn.onclick = function() {
+                        waBtn.onclick = () => {
                             showPackedPage(orderData);
                         };
                     }
                 } else if (pollCount >= 60) {
                     clearInterval(interval);
                     if (statusDiv) {
-                        statusDiv.innerHTML = '<p style="color:red;">⏰ Waktu habis. Jika sudah bayar, klik tombol di bawah.</p>';
+                        statusDiv.innerHTML = `<p style="color:red;">⏰ Waktu habis. Jika sudah bayar, klik tombol di bawah.</p>`;
                     }
                     if (waBtn) {
                         waBtn.style.display = 'inline-block';
-                        waBtn.onclick = function() {
+                        waBtn.onclick = () => {
                             showPackedPage(orderData);
                         };
                     }
@@ -363,87 +457,98 @@
             }
         }, 5000);
 
-        document.getElementById('btn-back-home').onclick = function() { showSection('landing'); };
+        document.getElementById('btn-back-home').onclick = () => showSection('landing');
     }
 
     // ===== SHOW PACKED PAGE =====
     function showPackedPage(data) {
         showSection('packed');
-        var elements = {
+        const elements = {
             'packed-order-id': data.orderId,
             'packed-resi': data.resi || '-',
             'packed-courier': data.kurir,
             'packed-total': data.totalHarga.toLocaleString(),
             'packed-method': data.metodeBayar,
         };
-        Object.keys(elements).forEach(function(id) {
-            var el = document.getElementById(id);
+        Object.keys(elements).forEach(id => {
+            const el = document.getElementById(id);
             if (el) el.textContent = elements[id];
         });
 
-        var btnWa = document.getElementById('btn-wa-packed');
+        const btnWa = document.getElementById('btn-wa-packed');
         if (btnWa) {
-            btnWa.onclick = function() {
-                var pesan = 'Halo ' + data.nama + ',\n\nPesanan Anda (' + data.orderId + ') sudah dikemas.\nResi: ' + (data.resi || '-') + '\nTotal: Rp ' + data.totalHarga.toLocaleString() + '\nKurir: ' + data.kurir + '\n\nTerima kasih!';
-                var url = 'https://wa.me/' + data.noHp.replace(/^0+/, '') + '?text=' + encodeURIComponent(pesan);
+            btnWa.onclick = () => {
+                const pesan =
+                    `Halo ${data.nama},\n\nPesanan Anda (${data.orderId}) sudah dikemas.\nResi: ${data.resi || '-'}\nTotal: Rp ${data.totalHarga.toLocaleString()}\nKurir: ${data.kurir}\n\nTerima kasih!`;
+                const url = `https://wa.me/${data.noHp.replace(/^0+/, '')}?text=${encodeURIComponent(pesan)}`;
                 window.open(url, '_blank');
             };
         }
 
-        var btnConfirm = document.getElementById('btn-confirm-shipped');
+        const btnConfirm = document.getElementById('btn-confirm-shipped');
         if (btnConfirm) {
-            btnConfirm.onclick = function() {
-                var pesanAdmin = 'Halo Admin,\n\nSaya sudah mengantarkan paket ke outlet ekspedisi.\nOrder ID: ' + data.orderId + '\nResi: ' + data.resi + '\nKurir: ' + data.kurir + '\n\nMohon update status di spreadsheet menjadi "sudah_dikirim = TRUE".';
-                var url = 'https://wa.me/' + CONFIG.WA_ADMIN + '?text=' + encodeURIComponent(pesanAdmin);
+            btnConfirm.onclick = () => {
+                const pesanAdmin =
+                    `Halo Admin,\n\nSaya sudah mengantarkan paket ke outlet ekspedisi.\nOrder ID: ${data.orderId}\nResi: ${data.resi}\nKurir: ${data.kurir}\n\nMohon update status di spreadsheet menjadi "sudah_dikirim = TRUE".`;
+                const url = `https://wa.me/${CONFIG.WA_ADMIN}?text=${encodeURIComponent(pesanAdmin)}`;
                 window.open(url, '_blank');
                 alert('✅ Kirim pesan ke admin. Jangan lupa update spreadsheet!');
             };
         }
 
-        document.getElementById('btn-back-home-packed').onclick = function() { showSection('landing'); };
+        document.getElementById('btn-back-home-packed').onclick = () => showSection('landing');
     }
 
     // ===== HANDLE TRACKING =====
     async function handleTracking() {
-        var noHp = document.getElementById('track-phone').value.trim();
+        const noHp = document.getElementById('track-phone').value.trim();
         if (!noHp) {
             alert('Masukkan No HP!');
             return;
         }
 
         try {
-            var response = await fetch(CONFIG.GS_API_URL + '?action=track-order&phone=' + encodeURIComponent(noHp));
-            var result = await response.json();
-            var resultDiv = document.getElementById('tracking-result');
+            const response = await fetch(`${CONFIG.GS_API_URL}?action=track-order&phone=${encodeURIComponent(noHp)}`);
+            const result = await response.json();
+            const resultDiv = document.getElementById('tracking-result');
 
             if (!resultDiv) return;
 
             if (result.success && result.orders && result.orders.length > 0) {
-                var html = '';
-                result.orders.forEach(function(order) {
-                    var status = order.shippingStatus || 'DIKEMAS';
-                    var step = 1;
+                let html = '';
+                result.orders.forEach(order => {
+                    let status = order.shippingStatus || 'DIKEMAS';
+                    let step = 1;
                     if (status === 'DIKIRIM') step = 2;
                     else if (status === 'DITERIMA') step = 3;
                     else if (status === 'MENUNGGU_PEMBAYARAN') step = 0;
 
-                    html += '<div class="tracking-item">' +
-                        '<p><strong>Order ID:</strong> ' + order.orderId + '</p>' +
-                        '<p><strong>Resi:</strong> ' + (order.cnoteNo || '-') + '</p>' +
-                        '<p><strong>Kurir:</strong> ' + (order.courierChoice || '-') + '</p>' +
-                        '<p><strong>Total:</strong> Rp ' + (order.totalPrice || 0).toLocaleString() + '</p>' +
-                        '<div class="tracking-progress">' +
-                        '<div class="tracking-step ' + (step >= 1 ? 'done' : '') + '"><div class="step-icon"><i class="fas fa-box"></i></div><span class="step-label">Dikemas</span></div>' +
-                        '<div class="tracking-step ' + (step >= 2 ? 'done' : '') + '"><div class="step-icon"><i class="fas fa-truck"></i></div><span class="step-label">Dikirim</span></div>' +
-                        '<div class="tracking-step ' + (step >= 3 ? 'done' : '') + '"><div class="step-icon"><i class="fas fa-check-circle"></i></div><span class="step-label">Diterima</span></div>' +
-                        '</div>' +
-                        (step === 0 ? '<p style="color:#e65100;font-weight:bold;">⏳ Menunggu Pembayaran</p>' : '') +
-                        '</div>';
+                    html += `<div class="tracking-item">
+                        <p><strong>Order ID:</strong> ${order.orderId}</p>
+                        <p><strong>Resi:</strong> ${order.cnoteNo || '-'}</p>
+                        <p><strong>Kurir:</strong> ${order.courierChoice || '-'}</p>
+                        <p><strong>Total:</strong> Rp ${(order.totalPrice || 0).toLocaleString()}</p>
+                        <div class="tracking-progress">
+                            <div class="tracking-step ${step >= 1 ? 'done' : ''}">
+                                <div class="step-icon"><i class="fas fa-box"></i></div>
+                                <span class="step-label">Dikemas</span>
+                            </div>
+                            <div class="tracking-step ${step >= 2 ? 'done' : ''}">
+                                <div class="step-icon"><i class="fas fa-truck"></i></div>
+                                <span class="step-label">Dikirim</span>
+                            </div>
+                            <div class="tracking-step ${step >= 3 ? 'done' : ''}">
+                                <div class="step-icon"><i class="fas fa-check-circle"></i></div>
+                                <span class="step-label">Diterima</span>
+                            </div>
+                        </div>
+                        ${step === 0 ? '<p style="color:#e65100;font-weight:bold;">⏳ Menunggu Pembayaran</p>' : ''}
+                    </div>`;
                 });
                 resultDiv.innerHTML = html;
                 resultDiv.style.display = 'block';
             } else {
-                resultDiv.innerHTML = '<p style="color:red;">' + (result.message || 'Pesanan tidak ditemukan') + '</p>';
+                resultDiv.innerHTML = `<p style="color:red;">${result.message || 'Pesanan tidak ditemukan'}</p>`;
                 resultDiv.style.display = 'block';
             }
         } catch (err) {
@@ -453,12 +558,12 @@
 
     // ===== COUNTDOWN =====
     function startCountdown() {
-        var totalSeconds = 1800;
+        let totalSeconds = 1800;
         function updateTimer() {
             if (totalSeconds <= 0) totalSeconds = 1800;
-            var m = Math.floor(totalSeconds / 60);
-            var s = totalSeconds % 60;
-            var timerEl = document.getElementById('countdown-timer');
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            const timerEl = document.getElementById('countdown-timer');
             if (timerEl) {
                 timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
             }
@@ -470,14 +575,14 @@
 
     // ===== GIMMICKS =====
     function startGimmicks() {
-        var sold = 10234;
-        setInterval(function() {
+        let sold = 10234;
+        setInterval(() => {
             sold += Math.floor(Math.random() * 5) + 1;
-            var counterEl = document.getElementById('sold-counter');
+            const counterEl = document.getElementById('sold-counter');
             if (counterEl) counterEl.textContent = sold.toLocaleString() + '+';
         }, 3000);
 
-        var buyers = [
+        const buyers = [
             { name: 'Ahmad Fauzi', city: 'Bandung' },
             { name: 'Dewi Sartika', city: 'Jakarta' },
             { name: 'Budi Santoso', city: 'Surabaya' },
@@ -505,24 +610,24 @@
             { name: 'Rizki Maulana', city: 'Sorong' },
         ];
 
-        var timePhrases = ['baru saja', '1 menit lalu', '2 menit lalu', '3 menit lalu', '4 menit lalu', '5 menit lalu', '8 menit lalu', '10 menit lalu', '12 menit lalu', '15 menit lalu'];
+        const timePhrases = ['baru saja', '1 menit lalu', '2 menit lalu', '3 menit lalu', '4 menit lalu', '5 menit lalu', '8 menit lalu', '10 menit lalu', '12 menit lalu', '15 menit lalu'];
 
         function showRandomPurchaseNotif() {
-            var random = buyers[Math.floor(Math.random() * buyers.length)];
-            var time = timePhrases[Math.floor(Math.random() * timePhrases.length)];
-            var text = random.name + ' dari ' + random.city + ' membeli produk ini ' + time;
-            var popup = document.getElementById('notification-popup');
-            var notifText = document.getElementById('notif-text');
+            const random = buyers[Math.floor(Math.random() * buyers.length)];
+            const time = timePhrases[Math.floor(Math.random() * timePhrases.length)];
+            const text = `${random.name} dari ${random.city} membeli produk ini ${time}`;
+            const popup = document.getElementById('notification-popup');
+            const notifText = document.getElementById('notif-text');
             if (popup && notifText) {
                 notifText.textContent = text;
                 popup.style.display = 'block';
-                setTimeout(function() { popup.style.display = 'none'; }, 5000);
+                setTimeout(() => { popup.style.display = 'none'; }, 5000);
             }
         }
 
         function scheduleNextNotif() {
-            var delay = Math.floor(Math.random() * 6000) + 4000;
-            setTimeout(function() {
+            const delay = Math.floor(Math.random() * 6000) + 4000;
+            setTimeout(() => {
                 showRandomPurchaseNotif();
                 scheduleNextNotif();
             }, delay);
@@ -531,16 +636,17 @@
         setTimeout(showRandomPurchaseNotif, 2000);
         scheduleNextNotif();
 
-        var trustMessages = ['🔥 Stok Terbatas!', '💰 Garansi Uang Kembali 100%', '⭐ Ulasan 4.9/5', '📦 Pengiriman Cepat!', '✅ 100% Produk Asli'];
-        var trustIndex = 0;
+        const trustMessages = ['🔥 Stok Terbatas!', '💰 Garansi Uang Kembali 100%', '⭐ Ulasan 4.9/5', '📦 Pengiriman Cepat!', '✅ 100% Produk Asli'];
+        let trustIndex = 0;
 
         function showTrustPopup() {
-            var popup = document.getElementById('trust-popup');
-            var content = document.getElementById('trust-content');
+            const popup = document.getElementById('trust-popup');
+            const content = document.getElementById('trust-content');
             if (popup && content) {
-                content.innerHTML = '<i class="fas fa-check-circle" style="color:#25D366;"></i> ' + trustMessages[trustIndex % trustMessages.length];
+                content.innerHTML = '<i class="fas fa-check-circle" style="color:#25D366;"></i> ' +
+                    trustMessages[trustIndex % trustMessages.length];
                 popup.style.display = 'block';
-                setTimeout(function() { popup.style.display = 'none'; }, 4000);
+                setTimeout(() => { popup.style.display = 'none'; }, 4000);
                 trustIndex++;
             }
         }
@@ -548,97 +654,5 @@
         setInterval(showTrustPopup, 10000);
         setTimeout(showTrustPopup, 3000);
     }
-
-    // ===== DOM READY =====
-    document.addEventListener('DOMContentLoaded', function() {
-        loadConfig();
-
-        var btnMinus = document.getElementById('btn-minus');
-        var btnPlus = document.getElementById('btn-plus');
-
-        if (btnMinus) {
-            btnMinus.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (currentQty > 1) {
-                    currentQty--;
-                    updatePriceDisplay();
-                }
-            });
-        }
-
-        if (btnPlus) {
-            btnPlus.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (currentQty < 5) {
-                    currentQty++;
-                    updatePriceDisplay();
-                } else {
-                    alert('Maksimal pembelian 5 pcs');
-                }
-            });
-        }
-
-        var voucherBtn = document.getElementById('btn-voucher');
-        if (voucherBtn) {
-            voucherBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                voucherUsed = !voucherUsed;
-                if (voucherUsed) {
-                    this.classList.add('used');
-                    this.innerHTML = '<i class="fas fa-check-circle"></i> Voucher Digunakan';
-                } else {
-                    this.classList.remove('used');
-                    this.innerHTML = '<i class="fas fa-ticket-alt"></i> Gunakan Voucher Gratis Ongkir';
-                }
-                updatePriceDisplay();
-            });
-        }
-
-        var btnCheckout1 = document.getElementById('btn-checkout');
-        var btnCheckout2 = document.getElementById('btn-checkout-footer');
-
-        if (btnCheckout1) {
-            btnCheckout1.addEventListener('click', handleCheckout);
-        }
-        if (btnCheckout2) {
-            btnCheckout2.addEventListener('click', handleCheckout);
-        }
-
-        var btnTrackHeader = document.getElementById('btn-track-header');
-        if (btnTrackHeader) {
-            btnTrackHeader.addEventListener('click', function() {
-                window.location.href = './tracking.html';
-            });
-        }
-
-        var btnTrackSubmit = document.getElementById('btn-track-submit');
-        if (btnTrackSubmit) {
-            btnTrackSubmit.addEventListener('click', handleTracking);
-        }
-
-        var btnBackHome = document.getElementById('btn-back-home');
-        if (btnBackHome) btnBackHome.addEventListener('click', function() { showSection('landing'); });
-
-        var btnBackHomePacked = document.getElementById('btn-back-home-packed');
-        if (btnBackHomePacked) btnBackHomePacked.addEventListener('click', function() { showSection('landing'); });
-
-        var btnBackHomeTrack = document.getElementById('btn-back-home-track');
-        if (btnBackHomeTrack) btnBackHomeTrack.addEventListener('click', function() { showSection('landing'); });
-
-        var btnHome = document.getElementById('btn-home');
-        if (btnHome) {
-            btnHome.addEventListener('click', function(e) {
-                e.preventDefault();
-                showSection('landing');
-            });
-        }
-
-        initSearchKecamatan();
-        updatePriceDisplay();
-        startCountdown();
-        startGimmicks();
-    });
 
 })();
