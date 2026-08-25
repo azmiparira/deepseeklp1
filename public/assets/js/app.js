@@ -1,786 +1,651 @@
 // ============================================================
-// JANJI JUS — app.js (v3) - FIXED
+// app.js — Landing Page Spray Tidur
+// Backend: Google Apps Script
+// GS_API_URL = https://script.google.com/macros/s/AKfycbzs2sIrux8crIhssdzUbTbbFp1hzpZlc6U_V2XkbgoYuszlXN730E4IbSSNwULiDYVe/exec
 // ============================================================
 
-(() => {
-  // ===== KONFIGURASI =====
-  const GS_API_URL = window.GS_API_URL || '';
+(function() {
+    'use strict';
 
-  if (!GS_API_URL) {
-    console.error('❌ GS_API_URL tidak diset! Tambahkan di window.GS_API_URL');
-  }
+    // ===== KONFIGURASI =====
+    const CONFIG = {
+        // === BACKEND APPS SCRIPT ===
+        GS_API_URL: window.GS_API_URL || 'https://script.google.com/macros/s/AKfycbzs2sIrux8crIhssdzUbTbbFp1hzpZlc6U_V2XkbgoYuszlXN730E4IbSSNwULiDYVe/exec',
 
-  // ===== STATE =====
-  const state = {
-    config: null,
-    qty: 1,
-    selectedCourier: 'JNT',
-    selectedPaytype: 'COD',
-    selectedChannel: null,
-    voucherApplied: false,
-    selectedArea: null,
-    pollTimer: null,
-    isProcessing: false,
-  };
+        // === ADMIN WHATSAPP ===
+        WA_ADMIN: '6281932696934',
 
-  const DISCOUNT_TIERS = { 1: 0, 2: 0.10, 3: 0.12, 4: 0.14, 5: 0.15 };
-  const MAX_QTY = 5;
-
-  const rupiah = (n) => 'Rp' + Math.round(n || 0).toLocaleString('id-ID');
-  const $ = (s) => document.querySelector(s);
-  const $$ = (s) => Array.from(document.querySelectorAll(s));
-
-  // ============================================================
-  // PRICING
-  // ============================================================
-  function calcPricing(basePrice, qty) {
-    const discountPercent = DISCOUNT_TIERS[qty] ?? 0;
-    const pricePerPcs = Math.round(basePrice * (1 - discountPercent));
-    return {
-      qty,
-      discountPercent,
-      pricePerPcs,
-      totalOriginal: basePrice * qty,
-      totalDiscounted: pricePerPcs * qty,
+        // === HARGA PRODUK (akan di-override oleh config dari backend) ===
+        HARGA_PER_PCS: 209000,
+        BERAT_PER_PCS: 0.15, // 150 gram
+        ONGKIR: 15000,
     };
-  }
 
-  // ============================================================
-  // UPDATE PRICE DISPLAY
-  // ============================================================
-  function updatePricing() {
-    if (!state.config) return;
-    const basePrice = state.config.productPrice || 209000;
-    const p = calcPricing(basePrice, state.qty);
+    // ===== DOM REFS =====
+    const sections = {
+        landing: document.getElementById('section-landing'),
+        payment: document.getElementById('section-payment'),
+        packed: document.getElementById('section-packed'),
+        tracking: document.getElementById('section-tracking'),
+    };
 
-    const shipping = state.voucherApplied ? 0 : 15000;
-    const total = p.totalDiscounted + shipping;
+    // ===== STATE =====
+    let currentQty = 1;
+    let shippingFee = CONFIG.ONGKIR;
+    let voucherUsed = false;
+    let currentOrderData = null;
+    let productPrice = CONFIG.HARGA_PER_PCS;
 
-    // Qty display
-    const qtyVal = $('#qty-val') || $('#qty-display');
-    if (qtyVal) qtyVal.textContent = state.qty;
-
-    // Tombol +/-
-    const qtyPlus = $('#qty-plus') || document.getElementById('btn-plus');
-    const qtyMinus = $('#qty-minus') || document.getElementById('btn-minus');
-    if (qtyPlus) qtyPlus.disabled = state.qty >= MAX_QTY;
-    if (qtyMinus) qtyMinus.disabled = state.qty <= 1;
-
-    // Harga
-    const priceFinal = $('#price-final') || $('#price-discount');
-    const priceStrike = $('#price-strike') || $('#price-original');
-    const discountChip = $('#discount-chip');
-
-    if (priceFinal) priceFinal.textContent = rupiah(p.totalDiscounted);
-    if (priceStrike) {
-      if (p.discountPercent > 0) {
-        priceStrike.style.visibility = 'visible';
-        priceStrike.textContent = rupiah(p.totalOriginal);
-      } else {
-        priceStrike.style.visibility = 'hidden';
-      }
-    }
-    if (discountChip) {
-      if (p.discountPercent > 0) {
-        discountChip.style.display = 'inline-block';
-        discountChip.textContent = `Hemat ${Math.round(p.discountPercent * 100)}%`;
-      } else {
-        discountChip.style.display = 'none';
-      }
+    // ===== FUNGSI HARGA =====
+    function getDiscountedPrice(qty) {
+        let disc = 0;
+        if (qty === 1) disc = 0;
+        else if (qty === 2) disc = 10;
+        else if (qty === 3) disc = 12;
+        else if (qty === 4) disc = 14;
+        else if (qty >= 5) disc = 15;
+        const price = productPrice;
+        const total = price * qty;
+        return Math.round(total - (total * disc / 100));
     }
 
-    // Subtotal
-    const sumProduct = $('#sum-product-label');
-    const sumSubtotal = $('#sum-subtotal');
-    const sumShipping = $('#sum-shipping');
-    const sumTotal = $('#sum-total');
+    function updatePriceDisplay() {
+        const qty = currentQty;
+        const originalTotal = productPrice * qty;
+        const finalTotal = getDiscountedPrice(qty);
+        const shipping = voucherUsed ? 0 : shippingFee;
+        const total = finalTotal + shipping;
 
-    if (sumProduct) sumProduct.textContent = `${state.config.productName || 'Spray Tidur'} × ${state.qty}`;
-    if (sumSubtotal) {
-      sumSubtotal.innerHTML = p.discountPercent > 0
-        ? `<span class="strike">${rupiah(p.totalOriginal)}</span> ${rupiah(p.totalDiscounted)}`
-        : rupiah(p.totalDiscounted);
-    }
-    if (sumShipping) {
-      sumShipping.textContent = state.voucherApplied ? 'Rp 0 (Gratis)' : 'Rp 15.000';
-    }
-    if (sumTotal) sumTotal.innerHTML = `<strong>${rupiah(total)}</strong>`;
+        // Update semua elemen harga
+        const priceOriginal = document.getElementById('price-original');
+        const priceDiscount = document.getElementById('price-discount');
+        const qtyDisplay = document.getElementById('qty-display');
+        const summarySubtotal = document.getElementById('summary-subtotal');
+        const summaryShipping = document.getElementById('summary-shipping');
+        const summaryTotal = document.getElementById('summary-total');
+        const footerOriginal = document.getElementById('footer-original');
+        const footerDiscount = document.getElementById('footer-discount');
 
-    // Sticky footer
-    const footerOriginal = $('#footer-original');
-    const footerDiscount = $('#footer-discount');
-    if (footerOriginal) {
-      footerOriginal.textContent = rupiah(p.totalOriginal);
-      footerOriginal.style.textDecoration = p.discountPercent > 0 ? 'line-through' : 'none';
-    }
-    if (footerDiscount) footerDiscount.textContent = rupiah(total);
-  }
-
-  // ============================================================
-  // LOAD CONFIG
-  // ============================================================
-  async function loadConfig() {
-    try {
-      const url = `${GS_API_URL}?action=config`;
-      const res = await fetch(url);
-      const json = await res.json();
-
-      if (!json.success) throw new Error(json.message || 'Gagal load config');
-
-      state.config = json.data;
-
-      // Update product info
-      const nameEl = $('#product-name');
-      const descEl = $('#product-desc');
-      if (nameEl) nameEl.textContent = state.config.productName || 'Spray Tidur';
-      if (descEl) descEl.textContent = state.config.productDescription || '';
-
-      // WA admin link
-      const waAdmin = state.config.waAdminNumber || state.config.waNumber || '';
-      const askLink = $('#ask-admin-link');
-      if (askLink) {
-        askLink.href = `https://wa.me/${waAdmin}?text=${encodeURIComponent('Halo min, saya mau tanya-tanya dulu soal produk ini')}`;
-      }
-
-      // Render options
-      renderCourierOptions();
-      renderPaytypeOptions();
-
-      // Update harga awal
-      updatePricing();
-
-      // Tampilkan notifikasi sukses
-      console.log('✅ Config loaded:', state.config);
-
-    } catch (err) {
-      console.error('❌ Gagal load config:', err);
-      alert('Gagal memuat konfigurasi. Pastikan GS_API_URL benar.');
-    }
-  }
-
-  // ============================================================
-  // RENDER COURIER OPTIONS
-  // ============================================================
-  function renderCourierOptions() {
-    const order = [
-      { key: 'JNT', label: 'JNT', icon: 'jnt', recommended: true },
-      { key: 'SiCepat', label: 'SiCepat', icon: 'sicepat', recommended: false },
-      { key: 'Sap', label: 'SAP', icon: 'sap', recommended: false },
-      { key: 'iDexpress', label: 'iDexpress', icon: 'idexpress', recommended: false },
-    ];
-
-    const container = $('#courier-group') || document.querySelector('.courier-list');
-    if (!container) return;
-
-    container.innerHTML = '';
-    order.forEach((c) => {
-      const label = document.createElement('label');
-      label.className = 'courier-item' + (c.recommended ? ' recommended' : '');
-      label.innerHTML = `
-        <input type="radio" name="courier" value="${c.key}" ${c.key === state.selectedCourier ? 'checked' : ''} />
-        ${c.recommended ? '<span class="recommended-badge">⭐ Direkomendasikan</span>' : ''}
-        <img src="./assets/img/couriers/${c.icon}.png" alt="${c.label}" class="courier-icon" onerror="this.style.display='none'" />
-        <span>${c.label}</span>
-      `;
-      const radio = label.querySelector('input[type="radio"]');
-      radio.addEventListener('change', () => {
-        state.selectedCourier = c.key;
-      });
-      container.appendChild(label);
-    });
-  }
-
-  // ============================================================
-  // RENDER PAYMENT OPTIONS
-  // ============================================================
-  function renderPaytypeOptions() {
-    const options = [
-      { key: 'COD', channel: null, label: 'COD', sub: 'Bayar ke kurir/outlet', icon: 'cod' },
-      { key: 'QRIS', channel: 'QRIS_CUSTOM', label: 'QRIS', sub: 'Semua e-wallet', icon: 'qris' },
-      { key: 'MANDIRI', channel: 'MANDIRI', label: 'Mandiri VA', sub: 'Virtual Account', icon: 'mandiri' },
-      { key: 'BCA', channel: 'BCA', label: 'BCA VA', sub: 'Virtual Account', icon: 'bca' },
-      { key: 'BNI', channel: 'BNI', label: 'BNI VA', sub: 'Virtual Account', icon: 'bni' },
-      { key: 'BRI', channel: 'BRI', label: 'BRI VA', sub: 'Virtual Account', icon: 'bri' },
-      { key: 'BSI', channel: 'BSI', label: 'BSI VA', sub: 'Virtual Account', icon: 'bsi' },
-      { key: 'ALFAMART', channel: 'ALFAMART', label: 'Alfamart', sub: 'Bayar di gerai', icon: 'alfamart' },
-      { key: 'INDOMARET', channel: 'INDOMARET', label: 'Indomaret', sub: 'Bayar di gerai', icon: 'indomaret' },
-    ];
-
-    const container = $('#paytype-group') || document.querySelector('.payment-list');
-    if (!container) return;
-
-    container.innerHTML = '';
-    options.forEach((opt) => {
-      const label = document.createElement('label');
-      label.className = 'payment-item';
-      label.innerHTML = `
-        <input type="radio" name="payment" value="${opt.key}" ${opt.key === state.selectedPaytype ? 'checked' : ''} />
-        <img src="./assets/img/payment/${opt.icon}.png" alt="${opt.label}" class="method-icon" onerror="this.style.display='none'" />
-        <span>${opt.label}</span>
-      `;
-      const radio = label.querySelector('input[type="radio"]');
-      radio.addEventListener('change', () => {
-        state.selectedPaytype = opt.key;
-        state.selectedChannel = opt.channel;
-      });
-      container.appendChild(label);
-    });
-  }
-
-  // ============================================================
-  // QTY CONTROL
-  // ============================================================
-  function initQtyControls() {
-    const btnPlus = document.getElementById('btn-plus');
-    const btnMinus = document.getElementById('btn-minus');
-
-    if (btnPlus) {
-      btnPlus.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (state.qty < MAX_QTY) {
-          state.qty += 1;
-          updatePricing();
-        } else {
-          alert('Maksimal pembelian 5 pcs');
+        if (priceOriginal) priceOriginal.textContent = 'Rp ' + originalTotal.toLocaleString();
+        if (priceDiscount) priceDiscount.textContent = 'Rp ' + finalTotal.toLocaleString();
+        if (qtyDisplay) qtyDisplay.textContent = qty;
+        if (summarySubtotal) summarySubtotal.textContent = 'Rp ' + finalTotal.toLocaleString();
+        if (summaryShipping) {
+            summaryShipping.textContent = voucherUsed ? 'Rp 0 (Gratis)' : 'Rp ' + shippingFee.toLocaleString();
         }
-      });
-    }
+        if (summaryTotal) summaryTotal.innerHTML = '<strong>Rp ' + total.toLocaleString() + '</strong>';
+        if (footerOriginal) footerOriginal.textContent = 'Rp ' + originalTotal.toLocaleString();
+        if (footerDiscount) footerDiscount.textContent = 'Rp ' + total.toLocaleString();
 
-    if (btnMinus) {
-      btnMinus.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (state.qty > 1) {
-          state.qty -= 1;
-          updatePricing();
+        // Update sticky footer
+        const stickyPrice = document.getElementById('sticky-price');
+        const stickyStrike = document.getElementById('sticky-strike');
+        if (stickyPrice) stickyPrice.textContent = 'Rp ' + total.toLocaleString();
+        if (stickyStrike) {
+            if (originalTotal > finalTotal) {
+                stickyStrike.style.display = 'block';
+                stickyStrike.textContent = 'Rp ' + originalTotal.toLocaleString();
+            } else {
+                stickyStrike.style.display = 'none';
+            }
         }
-      });
     }
-  }
 
-  // ============================================================
-  // VOUCHER
-  // ============================================================
-  function initVoucher() {
-    const btn = document.getElementById('btn-voucher');
-    if (!btn) return;
+    // ===== QTY CONTROL =====
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load config dari backend
+        loadConfig();
 
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      state.voucherApplied = !state.voucherApplied;
-      btn.classList.toggle('used', state.voucherApplied);
-      btn.innerHTML = state.voucherApplied
-        ? '<i class="fas fa-check-circle"></i> Voucher Digunakan'
-        : '<i class="fas fa-ticket-alt"></i> Gunakan Voucher Gratis Ongkir';
-      updatePricing();
-    });
-  }
+        // QTY
+        const btnMinus = document.getElementById('btn-minus');
+        const btnPlus = document.getElementById('btn-plus');
 
-  // ============================================================
-  // SEARCH KECAMATAN (Autocomplete)
-  // ============================================================
-  function initSearchKecamatan() {
-    const searchInput = document.getElementById('kecamatan-search');
-    const resultsDiv = document.getElementById('kecamatan-results');
-
-    if (!searchInput || !resultsDiv) return;
-
-    let debounceTimer;
-
-    searchInput.addEventListener('input', () => {
-      clearTimeout(debounceTimer);
-      const keyword = searchInput.value.trim();
-      state.selectedArea = null;
-      resultsDiv.classList.remove('active');
-
-      if (keyword.length < 3) return;
-
-      debounceTimer = setTimeout(async () => {
-        try {
-          const url = `${GS_API_URL}?action=address-search&keyword=${encodeURIComponent(keyword)}`;
-          const res = await fetch(url);
-          const json = await res.json();
-
-          if (!json.success || !json.data || json.data.length === 0) {
-            resultsDiv.innerHTML = '<div class="search-result-item">Tidak ditemukan, coba kata kunci lain.</div>';
-            resultsDiv.classList.add('active');
-            return;
-          }
-
-          resultsDiv.innerHTML = '';
-          const seen = new Set();
-
-          json.data.slice(0, 15).forEach((item) => {
-            const label = item.DISTRICT_NAME || item.SUBDISTRICT_NAME || '';
-            if (!label || seen.has(label)) return;
-            seen.add(label);
-
-            const div = document.createElement('div');
-            div.className = 'search-result-item';
-            div.innerHTML = `
-              ${label}
-              <span class="result-detail">${item.CITY_NAME || ''}, ${item.PROVINCE_NAME || ''}</span>
-            `;
-            div.dataset.provinsi = item.PROVINCE_NAME || '';
-            div.dataset.kabupaten = item.CITY_NAME || '';
-            div.dataset.kecamatan = label;
-            div.dataset._id = item._id || '';
-
-            div.addEventListener('click', () => {
-              document.getElementById('provinsi').value = div.dataset.provinsi;
-              document.getElementById('kabupaten').value = div.dataset.kabupaten;
-              document.getElementById('kecamatan').value = div.dataset.kecamatan;
-              searchInput.value = div.dataset.kecamatan;
-              state.selectedArea = {
-                PROVINCE_NAME: div.dataset.provinsi,
-                CITY_NAME: div.dataset.kabupaten,
-                DISTRICT_NAME: div.dataset.kecamatan,
-                _id: div.dataset._id,
-              };
-              resultsDiv.classList.remove('active');
+        if (btnMinus) {
+            btnMinus.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (currentQty > 1) {
+                    currentQty--;
+                    updatePriceDisplay();
+                }
             });
+        }
 
-            resultsDiv.appendChild(div);
-          });
+        if (btnPlus) {
+            btnPlus.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (currentQty < 5) {
+                    currentQty++;
+                    updatePriceDisplay();
+                } else {
+                    alert('Maksimal pembelian 5 pcs');
+                }
+            });
+        }
 
-          resultsDiv.classList.add('active');
+        // ===== VOUCHER =====
+        const voucherBtn = document.getElementById('btn-voucher');
+        if (voucherBtn) {
+            voucherBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                voucherUsed = !voucherUsed;
+                if (voucherUsed) {
+                    this.classList.add('used');
+                    this.innerHTML = '<i class="fas fa-check-circle"></i> Voucher Digunakan';
+                } else {
+                    this.classList.remove('used');
+                    this.innerHTML = '<i class="fas fa-ticket-alt"></i> Gunakan Voucher Gratis Ongkir';
+                }
+                updatePriceDisplay();
+            });
+        }
 
+        // ===== SUBMIT ORDER (dua tombol) =====
+        const btnCheckout1 = document.getElementById('btn-checkout');
+        const btnCheckout2 = document.getElementById('btn-checkout-footer');
+
+        if (btnCheckout1) {
+            btnCheckout1.addEventListener('click', handleCheckout);
+        }
+        if (btnCheckout2) {
+            btnCheckout2.addEventListener('click', handleCheckout);
+        }
+
+        // ===== TRACKING HEADER =====
+        const btnTrackHeader = document.getElementById('btn-track-header');
+        if (btnTrackHeader) {
+            btnTrackHeader.addEventListener('click', function() {
+                // Redirect ke halaman tracking
+                window.location.href = './tracking.html';
+            });
+        }
+
+        // ===== TRACKING SUBMIT (di landing page) =====
+        const btnTrackSubmit = document.getElementById('btn-track-submit');
+        if (btnTrackSubmit) {
+            btnTrackSubmit.addEventListener('click', handleTracking);
+        }
+
+        // ===== BACK BUTTONS =====
+        const btnBackHome = document.getElementById('btn-back-home');
+        if (btnBackHome) btnBackHome.addEventListener('click', function() { showSection('landing'); });
+
+        const btnBackHomePacked = document.getElementById('btn-back-home-packed');
+        if (btnBackHomePacked) btnBackHomePacked.addEventListener('click', function() { showSection('landing'); });
+
+        const btnBackHomeTrack = document.getElementById('btn-back-home-track');
+        if (btnBackHomeTrack) btnBackHomeTrack.addEventListener('click', function() { showSection('landing'); });
+
+        // ===== BERANDA HEADER =====
+        const btnHome = document.getElementById('btn-home');
+        if (btnHome) {
+            btnHome.addEventListener('click', function(e) {
+                e.preventDefault();
+                showSection('landing');
+            });
+        }
+
+        // ===== SEARCH KECAMATAN =====
+        initSearchKecamatan();
+
+        // ===== INIT =====
+        updatePriceDisplay();
+        startCountdown();
+        startGimmicks();
+    });
+
+    // ===== LOAD CONFIG DARI BACKEND =====
+    async function loadConfig() {
+        try {
+            const response = await fetch(`${CONFIG.GS_API_URL}?action=config`);
+            const result = await response.json();
+            if (result.success && result.data) {
+                const data = result.data;
+                productPrice = data.productPrice || CONFIG.HARGA_PER_PCS;
+                shippingFee = data.freeShippingDisplayValue || CONFIG.ONGKIR;
+                document.getElementById('product-name').textContent = data.productName || 'Spray Tidur';
+                document.getElementById('product-desc').textContent = data.productDescription || 'Spray tidur - BPOM HALAL, aman tidak berbahaya';
+                updatePriceDisplay();
+            }
         } catch (err) {
-          console.error('Error search kecamatan:', err);
-          resultsDiv.innerHTML = '<div class="search-result-item">Gagal mencari, coba lagi.</div>';
-          resultsDiv.classList.add('active');
+            console.warn('Gagal load config dari backend, pakai default:', err);
         }
-      }, 400);
-    });
+    }
 
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.search-wrapper')) {
-        resultsDiv.classList.remove('active');
-      }
-    });
-  }
+    // ===== SEARCH KECAMATAN =====
+    function initSearchKecamatan() {
+        const searchInput = document.getElementById('kecamatan-search');
+        const resultsDiv = document.getElementById('kecamatan-results');
 
-  // ============================================================
-  // HANDLE CHECKOUT
-  // ============================================================
-  async function handleCheckout(e) {
-    e.preventDefault();
+        if (!searchInput || !resultsDiv) return;
 
-    if (state.isProcessing) return;
-    state.isProcessing = true;
+        searchInput.addEventListener('input', async function() {
+            const keyword = this.value.trim();
+            if (keyword.length < 2) {
+                resultsDiv.classList.remove('active');
+                return;
+            }
+            try {
+                const response = await fetch(`${CONFIG.GS_API_URL}?action=address-search&keyword=${encodeURIComponent(keyword)}`);
+                const json = await response.json();
+                if (json.success && json.data && json.data.length > 0) {
+                    resultsDiv.innerHTML = '';
+                    const seen = new Set();
+                    json.data.forEach(item => {
+                        const label = item.DISTRICT_NAME;
+                        if (label && !seen.has(label)) {
+                            seen.add(label);
+                            const div = document.createElement('div');
+                            div.className = 'search-result-item';
+                            div.innerHTML =
+                                `${label} <span class="result-detail">${item.CITY_NAME || ''}, ${item.PROVINCE_NAME || ''}</span>`;
+                            div.dataset.provinsi = item.PROVINCE_NAME || '';
+                            div.dataset.kabupaten = item.CITY_NAME || '';
+                            div.dataset.kecamatan = label;
+                            div.dataset.destinationId = item._id || '';
+                            div.addEventListener('click', function() {
+                                const provinsiInput = document.getElementById('provinsi');
+                                const kabupatenInput = document.getElementById('kabupaten');
+                                const kecamatanInput = document.getElementById('kecamatan');
+                                const destIdInput = document.getElementById('destination-address-id');
+                                if (provinsiInput) provinsiInput.value = this.dataset.provinsi;
+                                if (kabupatenInput) kabupatenInput.value = this.dataset.kabupaten;
+                                if (kecamatanInput) kecamatanInput.value = this.dataset.kecamatan;
+                                if (destIdInput) destIdInput.value = this.dataset.destinationId;
+                                searchInput.value = this.dataset.kecamatan;
+                                resultsDiv.classList.remove('active');
+                            });
+                            resultsDiv.appendChild(div);
+                        }
+                    });
+                    resultsDiv.classList.add('active');
+                } else {
+                    resultsDiv.classList.remove('active');
+                }
+            } catch (err) {
+                console.error('Error search kecamatan:', err);
+            }
+        });
 
-    const btn = document.getElementById('btn-checkout') || document.getElementById('submit-btn');
-    const footerBtn = document.getElementById('btn-checkout-footer');
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-wrapper')) {
+                resultsDiv.classList.remove('active');
+            }
+        });
+    }
 
-    if (btn) { btn.disabled = true; btn.textContent = 'Memproses…'; }
-    if (footerBtn) { footerBtn.disabled = true; footerBtn.textContent = 'Memproses…'; }
+    // ===== SHOW SECTION =====
+    function showSection(id) {
+        Object.keys(sections).forEach(key => {
+            if (sections[key]) {
+                sections[key].classList.toggle('active', key === id);
+            }
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 
-    try {
-      // Ambil data form
-      const nama = document.getElementById('full-name').value.trim();
-      const noHp = document.getElementById('phone').value.trim();
-      const provinsi = document.getElementById('provinsi').value;
-      const kabupaten = document.getElementById('kabupaten').value;
-      const kecamatan = document.getElementById('kecamatan').value;
-      const alamat = document.getElementById('alamat-lengkap').value.trim();
+    // ===== HANDLE CHECKOUT =====
+    async function handleCheckout() {
+        const nama = document.getElementById('full-name').value.trim();
+        const noHp = document.getElementById('phone').value.trim();
+        const provinsi = document.getElementById('provinsi').value;
+        const kabupaten = document.getElementById('kabupaten').value;
+        const kecamatan = document.getElementById('kecamatan').value;
+        const alamat = document.getElementById('alamat-lengkap').value.trim();
+        const destId = document.getElementById('destination-address-id')?.value || '';
+        const payment = document.querySelector('input[name="payment"]:checked');
+        const courier = document.querySelector('input[name="courier"]:checked');
 
-      // Ambil payment & courier dari radio
-      const paymentRadio = document.querySelector('input[name="payment"]:checked');
-      const courierRadio = document.querySelector('input[name="courier"]:checked');
+        if (!payment || !courier) {
+            alert('Pilih metode pembayaran dan kurir!');
+            return;
+        }
 
-      if (!paymentRadio || !courierRadio) {
-        alert('Pilih metode pembayaran dan kurir!');
-        throw new Error('Pilih metode pembayaran dan kurir');
-      }
+        const paymentMethod = payment.value;
+        const courierMethod = courier.value;
 
-      const paymentMethod = paymentRadio.value;
-      const courierMethod = courierRadio.value;
+        if (!nama) {
+            alert('Nama lengkap wajib diisi!');
+            return;
+        }
+        if (!noHp || noHp.length < 8) {
+            alert('Nomor HP tidak valid!');
+            return;
+        }
+        if (!kecamatan || !alamat || !destId) {
+            alert('Harap isi kecamatan dan alamat lengkap!');
+            return;
+        }
 
-      // Validasi
-      if (!nama) { alert('Nama lengkap wajib diisi!'); throw new Error('Nama kosong'); }
-      if (!noHp || noHp.length < 8) { alert('Nomor HP tidak valid!'); throw new Error('HP invalid'); }
-      if (!kecamatan || !alamat) { alert('Harap isi kecamatan dan alamat lengkap!'); throw new Error('Alamat kosong'); }
+        const qty = currentQty;
+        const subtotal = getDiscountedPrice(qty);
+        const shipping = voucherUsed ? 0 : shippingFee;
+        const total = subtotal + shipping;
+        const isCOD = (paymentMethod === 'COD');
+        const weight = CONFIG.BERAT_PER_PCS * qty;
 
-      if (!state.selectedArea) {
-        alert('Harap pilih kecamatan dari daftar pencarian!');
-        throw new Error('Area tidak dipilih');
-      }
+        // ===== BUAT ORDER DI BACKEND (via Apps Script) =====
+        let resi = null;
+        let orderId = null;
+        try {
+            const payload = {
+                customerName: nama,
+                customerPhone: noHp,
+                province: provinsi,
+                city: kabupaten,
+                district: kecamatan,
+                subdistrict: kecamatan,
+                addressDetail: alamat,
+                destinationAddressId: destId,
+                qty: qty,
+                courierChoice: courierMethod,
+                paymentType: isCOD ? 'COD' : 'NONCOD',
+                paymentChannel: isCOD ? null : paymentMethod,
+            };
 
-      const qty = state.qty;
-      const basePrice = state.config?.productPrice || 209000;
-      const p = calcPricing(basePrice, qty);
-      const shipping = state.voucherApplied ? 0 : 15000;
-      const total = p.totalDiscounted + shipping;
-      const isCOD = (paymentMethod === 'COD');
-      const weight = (state.config?.productWeight || 0.15) * qty;
+            const response = await fetch(`${CONFIG.GS_API_URL}?action=create-order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json();
 
-      // Buat payload
-      const payload = {
-        customerName: nama,
-        customerPhone: noHp.replace(/\D/g, ''),
-        province: state.selectedArea.PROVINCE_NAME || provinsi,
-        city: state.selectedArea.CITY_NAME || kabupaten,
-        district: state.selectedArea.DISTRICT_NAME || kecamatan,
-        subdistrict: state.selectedArea.DISTRICT_NAME || kecamatan,
-        addressDetail: alamat,
-        destinationAddressId: state.selectedArea._id || '',
-        qty: qty,
-        courierChoice: courierMethod,
-        paymentType: isCOD ? 'COD' : 'NONCOD',
-        paymentChannel: isCOD ? null : state.selectedChannel,
-      };
+            if (!result.success) {
+                alert('Gagal buat order: ' + (result.message || 'Unknown error'));
+                return;
+            }
 
-      console.log('📦 Payload:', payload);
+            orderId = result.orderId;
+            resi = result.resi || '-';
 
-      // Kirim ke backend
-      const response = await fetch(`${GS_API_URL}?action=create-order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+            // Simpan data order untuk halaman packed
+            currentOrderData = {
+                orderId: orderId,
+                nama: nama,
+                noHp: noHp,
+                totalHarga: total,
+                kurir: courierMethod,
+                metodeBayar: paymentMethod,
+                resi: resi,
+                isCOD: isCOD,
+            };
 
-      const result = await response.json();
+            if (isCOD) {
+                showPackedPage(currentOrderData);
+            } else {
+                // NON-COD: tampilkan halaman pembayaran
+                if (result.payment) {
+                    showPaymentPage(result.payment, currentOrderData);
+                } else {
+                    alert('Gagal mendapatkan data pembayaran');
+                }
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    }
 
-      if (!result.success) {
-        throw new Error(result.message || 'Checkout gagal');
-      }
-
-      if (isCOD) {
-        // COD: langsung ke tracking
-        window.location.href = `./tracking.html?order=${encodeURIComponent(result.orderId)}`;
-      } else {
-        // NON-COD: tampilkan halaman pembayaran
-        renderPaymentScreen(result);
+    // ===== SHOW PAYMENT PAGE =====
+    function showPaymentPage(cashiResp, orderData) {
         showSection('payment');
-        startPolling(result.orderId);
-      }
+        const instr = document.getElementById('payment-instruction');
+        const statusDiv = document.getElementById('payment-status');
+        const waBtn = document.getElementById('btn-wa-payment');
 
-    } catch (err) {
-      console.error('❌ Checkout error:', err);
-      const msgEl = document.getElementById('form-msg');
-      if (msgEl) {
-        msgEl.textContent = err.message || 'Terjadi kesalahan, coba lagi.';
-        msgEl.classList.add('show');
-      } else {
-        alert(err.message || 'Terjadi kesalahan, coba lagi.');
-      }
-    } finally {
-      state.isProcessing = false;
-      const btn = document.getElementById('btn-checkout') || document.getElementById('submit-btn');
-      const footerBtn = document.getElementById('btn-checkout-footer');
-      if (btn) { btn.disabled = false; btn.textContent = 'Pesan Sekarang!'; }
-      if (footerBtn) { footerBtn.disabled = false; footerBtn.textContent = 'Pesan Sekarang!'; }
-    }
-  }
-
-  // ============================================================
-  // SHOW SECTION
-  // ============================================================
-  function showSection(id) {
-    const sections = ['section-landing', 'section-payment', 'section-packed', 'section-tracking'];
-    sections.forEach(s => {
-      const el = document.getElementById(s);
-      if (el) el.classList.toggle('active', s === id);
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  // ============================================================
-  // RENDER PAYMENT SCREEN
-  // ============================================================
-  function renderPaymentScreen(result) {
-    const p = result.payment || {};
-    const orderId = result.orderId || '';
-    const totalPrice = result.totalPrice || 0;
-
-    document.getElementById('pay-order-id').textContent = orderId;
-    document.getElementById('pay-total-val').textContent = rupiah(p.total_amount ?? totalPrice);
-
-    document.getElementById('pay-qris').style.display = 'none';
-    document.getElementById('pay-va').style.display = 'none';
-    document.getElementById('pay-retail').style.display = 'none';
-    document.getElementById('pay-steps').innerHTML = '';
-
-    const extLink = document.getElementById('pay-external-link');
-    if (extLink) {
-      if (p.checkout_url) {
-        extLink.href = p.checkout_url;
-        extLink.style.display = 'inline';
-      } else {
-        extLink.style.display = 'none';
-      }
-    }
-
-    if (p.qrUrl) {
-      document.getElementById('pay-qris').style.display = 'block';
-      document.getElementById('pay-qr-img').src = p.qrUrl;
-      setPaymentSteps([
-        'Screenshot atau scan langsung kode QR di atas',
-        'Buka aplikasi dompet digital (Dana, Gopay, OVO, ShopeePay, dll)',
-        'Pilih menu Scan QR, lalu scan kode QRIS di atas',
-        'Pastikan nominal & data transaksi sudah sesuai',
-        'Selesaikan pembayaran, halaman ini otomatis update',
-      ]);
-    } else if (p.va_number) {
-      document.getElementById('pay-va').style.display = 'block';
-      document.getElementById('pay-va-bank').textContent = p.bank_name || p.bank || 'Virtual Account';
-      document.getElementById('pay-va-number').textContent = p.va_number;
-      setPaymentSteps([
-        'Buka aplikasi mobile banking sesuai bank di atas',
-        'Pilih menu Transfer / Virtual Account',
-        'Masukkan nomor Virtual Account di atas',
-        'Masukkan nominal sesuai Total Bayar',
-        'Konfirmasi dan selesaikan pembayaran',
-      ]);
-    } else if (p.payment_code) {
-      document.getElementById('pay-retail').style.display = 'block';
-      document.getElementById('pay-retail-name').textContent = p.retail_name || 'Retail';
-      document.getElementById('pay-retail-code').textContent = p.payment_code;
-      setPaymentSteps([
-        `Datang ke gerai ${p.retail_name || 'retail'} terdekat`,
-        'Sampaikan ke kasir ingin melakukan pembayaran',
-        'Sebutkan kode pembayaran di atas',
-        'Bayar sesuai nominal Total Bayar',
-        'Simpan bukti pembayaran Anda',
-      ]);
-    } else {
-      document.getElementById('pay-steps').innerHTML = `<li>${JSON.stringify(p)}</li>`;
-    }
-  }
-
-  function setPaymentSteps(items) {
-    const el = document.getElementById('pay-steps');
-    if (el) el.innerHTML = items.map(s => `<li>${s}</li>`).join('');
-  }
-
-  // ============================================================
-  // POLLING
-  // ============================================================
-  function startPolling(orderId) {
-    if (state.pollTimer) clearInterval(state.pollTimer);
-
-    state.pollTimer = setInterval(async () => {
-      try {
-        const res = await fetch(`${GS_API_URL}?action=check-status&orderId=${encodeURIComponent(orderId)}`);
-        const json = await res.json();
-
-        if (!json.success) return;
-
-        if (json.paymentStatus === 'PAID' || json.paymentStatus === 'PAID_PENDING_SYNC') {
-          clearInterval(state.pollTimer);
-          window.location.href = `./tracking.html?order=${encodeURIComponent(orderId)}`;
+        let html = `<p><strong>Total:</strong> Rp ${orderData.totalHarga.toLocaleString()}</p>`;
+        html += `<p><strong>Order ID:</strong> ${orderData.orderId}</p>`;
+        if (cashiResp.qrUrl) {
+            html += `<p>Scan QRIS:</p><img src="${cashiResp.qrUrl}" style="max-width:200px;display:block;margin:10px auto;border-radius:10px;"/>`;
+        } else if (cashiResp.va_number) {
+            html += `<p><strong>Virtual Account:</strong> ${cashiResp.va_number}</p><p><strong>Bank:</strong> ${cashiResp.bank_name || cashiResp.bank}</p>`;
+        } else if (cashiResp.payment_code) {
+            html += `<p><strong>Kode Pembayaran:</strong> ${cashiResp.payment_code}</p><p><strong>Retail:</strong> ${cashiResp.retail_name || cashiResp.retail_code}</p>`;
+        } else {
+            html += `<pre>${JSON.stringify(cashiResp, null, 2)}</pre>`;
         }
-      } catch (e) {
-        // silent
-      }
-    }, 4000);
-  }
+        if (instr) instr.innerHTML = html;
+        if (statusDiv) {
+            statusDiv.innerHTML = `<p>Menunggu pembayaran... (auto-check setiap 5 detik)</p><div class="spinner"></div>`;
+        }
+        if (waBtn) waBtn.style.display = 'none';
 
-  // ============================================================
-  // GIMMICKS
-  // ============================================================
-  function startCountdown() {
-    let seconds = 30 * 60; // 30 menit
-    const el = document.getElementById('countdown-timer');
-    if (!el) return;
+        // Polling status
+        let pollCount = 0;
+        const interval = setInterval(async () => {
+            pollCount++;
+            try {
+                const response = await fetch(`${CONFIG.GS_API_URL}?action=check-status&orderId=${orderData.orderId}`);
+                const result = await response.json();
+                if (result.success && result.paymentStatus === 'PAID') {
+                    clearInterval(interval);
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `<p style="color:#25D366;font-weight:bold;">✅ Pembayaran berhasil!</p>`;
+                    }
+                    if (waBtn) {
+                        waBtn.style.display = 'inline-block';
+                        waBtn.onclick = () => {
+                            showPackedPage(orderData);
+                        };
+                    }
+                } else if (pollCount >= 60) {
+                    clearInterval(interval);
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `<p style="color:red;">⏰ Waktu habis. Jika sudah bayar, klik tombol di bawah.</p>`;
+                    }
+                    if (waBtn) {
+                        waBtn.style.display = 'inline-block';
+                        waBtn.onclick = () => {
+                            showPackedPage(orderData);
+                        };
+                    }
+                }
+            } catch (e) {
+                console.warn(e);
+            }
+        }, 5000);
 
-    setInterval(() => {
-      seconds -= 1;
-      if (seconds < 0) seconds = 30 * 60;
-      const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-      const s = String(seconds % 60).padStart(2, '0');
-      el.textContent = `${m}:${s}`;
-    }, 1000);
-  }
-
-  function startFakeNotif() {
-    const names = [
-      'Ahmad Fauzi', 'Dewi Sartika', 'Budi Santoso', 'Rina Anggraini', 'Fajar Ramadhan',
-      'Nurul Hikmah', 'Agus Salim', 'Siti Aisyah', 'Andi Pratama', 'Mega Lestari',
-      'Rudi Hartono', 'Lisa Permata', 'Doni Saputra', 'Winda Sari', 'Hendra Wijaya',
-      'Rizky Amelia', 'Gilang Nugroho', 'Diana Putri', 'Eko Prasetyo', 'Maya Sari',
-      'Irfan Hakim', 'Tiara Maharani', 'Arif Rahman', 'Laila Fitria', 'Rizki Maulana'
-    ];
-    const cities = ['Bandung', 'Jakarta', 'Surabaya', 'Semarang', 'Medan', 'Sukabumi', 'Bekasi', 'Depok', 'Malang', 'Makassar'];
-    const times = ['baru saja', '1 menit lalu', '2 menit lalu', '3 menit lalu', '4 menit lalu', '5 menit lalu', '8 menit lalu', '10 menit lalu', '12 menit lalu', '15 menit lalu'];
-
-    function showNotif() {
-      const name = names[Math.floor(Math.random() * names.length)];
-      const city = cities[Math.floor(Math.random() * cities.length)];
-      const time = times[Math.floor(Math.random() * times.length)];
-      const popup = document.getElementById('notification-popup');
-      const textEl = document.getElementById('notif-text');
-      if (popup && textEl) {
-        textEl.textContent = `${name} dari ${city} membeli produk ini ${time}`;
-        popup.style.display = 'block';
-        setTimeout(() => { popup.style.display = 'none'; }, 5000);
-      }
+        document.getElementById('btn-back-home').onclick = () => showSection('landing');
     }
 
-    setTimeout(showNotif, 3000);
-    setInterval(showNotif, 8000 + Math.random() * 5000);
-  }
-
-  function startTrustPopup() {
-    const messages = ['🔥 Stok Terbatas!', '💰 Garansi Uang Kembali 100%', '⭐ Ulasan 4.9/5', '📦 Pengiriman Cepat!', '✅ 100% Produk Asli'];
-    let index = 0;
-    const popup = document.getElementById('trust-popup');
-    const content = document.getElementById('trust-content');
-
-    if (!popup || !content) return;
-
-    function show() {
-      content.innerHTML = `<i class="fas fa-check-circle" style="color:#25D366;"></i> ${messages[index % messages.length]}`;
-      popup.style.display = 'block';
-      setTimeout(() => { popup.style.display = 'none'; }, 4000);
-      index++;
-    }
-
-    setTimeout(show, 2000);
-    setInterval(show, 10000);
-  }
-
-  function startSoldCounter() {
-    let sold = 10234;
-    const el = document.getElementById('sold-counter');
-    if (!el) return;
-
-    setInterval(() => {
-      sold += Math.floor(Math.random() * 5) + 1;
-      el.textContent = sold.toLocaleString() + '+';
-    }, 3000);
-  }
-
-  // ============================================================
-  // STICKY FOOTER
-  // ============================================================
-  function initStickyBar() {
-    const bar = document.getElementById('sticky-footer');
-    if (!bar) return;
-
-    window.addEventListener('scroll', () => {
-      bar.style.display = window.scrollY > 400 ? 'flex' : 'none';
-    });
-    bar.style.display = 'none';
-  }
-
-  // ============================================================
-  // INIT
-  // ============================================================
-  function init() {
-    // Load config dulu, baru yang lain
-    loadConfig().then(() => {
-      initQtyControls();
-      initVoucher();
-      initSearchKecamatan();
-      initStickyBar();
-
-      // Tombol checkout
-      const btn1 = document.getElementById('btn-checkout');
-      const btn2 = document.getElementById('btn-checkout-footer');
-      if (btn1) btn1.addEventListener('click', handleCheckout);
-      if (btn2) btn2.addEventListener('click', handleCheckout);
-
-      // Tombol tracking header
-      const trackBtn = document.getElementById('btn-track-header');
-      if (trackBtn) {
-        trackBtn.addEventListener('click', () => {
-          showSection('section-tracking');
-          const resultDiv = document.getElementById('tracking-result');
-          if (resultDiv) resultDiv.style.display = 'none';
+    // ===== SHOW PACKED PAGE =====
+    function showPackedPage(data) {
+        showSection('packed');
+        const elements = {
+            'packed-order-id': data.orderId,
+            'packed-resi': data.resi || '-',
+            'packed-courier': data.kurir,
+            'packed-total': data.totalHarga.toLocaleString(),
+            'packed-method': data.metodeBayar,
+        };
+        Object.keys(elements).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = elements[id];
         });
-      }
 
-      // Tombol back
-      const backs = ['btn-back-home', 'btn-back-home-packed', 'btn-back-home-track'];
-      backs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('click', () => showSection('section-landing'));
-      });
+        const btnWa = document.getElementById('btn-wa-packed');
+        if (btnWa) {
+            btnWa.onclick = () => {
+                const pesan =
+                    `Halo ${data.nama},\n\nPesanan Anda (${data.orderId}) sudah dikemas.\nResi: ${data.resi || '-'}\nTotal: Rp ${data.totalHarga.toLocaleString()}\nKurir: ${data.kurir}\n\nTerima kasih!`;
+                const url = `https://wa.me/${data.noHp.replace(/^0+/, '')}?text=${encodeURIComponent(pesan)}`;
+                window.open(url, '_blank');
+            };
+        }
 
-      // Tombol tracking submit
-      const trackSubmit = document.getElementById('btn-track-submit');
-      if (trackSubmit) {
-        trackSubmit.addEventListener('click', handleTracking);
-      }
+        const btnConfirm = document.getElementById('btn-confirm-shipped');
+        if (btnConfirm) {
+            btnConfirm.onclick = () => {
+                const pesanAdmin =
+                    `Halo Admin,\n\nSaya sudah mengantarkan paket ke outlet ekspedisi.\nOrder ID: ${data.orderId}\nResi: ${data.resi}\nKurir: ${data.kurir}\n\nMohon update status di spreadsheet menjadi "sudah_dikirim = TRUE".`;
+                const url = `https://wa.me/${CONFIG.WA_ADMIN}?text=${encodeURIComponent(pesanAdmin)}`;
+                window.open(url, '_blank');
+                alert('✅ Kirim pesan ke admin. Jangan lupa update spreadsheet!');
+            };
+        }
 
-      // Gimmicks
-      startCountdown();
-      startFakeNotif();
-      startTrustPopup();
-      startSoldCounter();
-
-      console.log('✅ App initialized!');
-    });
-  }
-
-  // ============================================================
-  // HANDLE TRACKING
-  // ============================================================
-  async function handleTracking() {
-    const noHp = document.getElementById('track-phone').value.trim();
-    if (!noHp) {
-      alert('Masukkan No HP!');
-      return;
+        document.getElementById('btn-back-home-packed').onclick = () => showSection('landing');
     }
 
-    try {
-      const response = await fetch(`${GS_API_URL}?action=track-order&phone=${encodeURIComponent(noHp)}`);
-      const result = await response.json();
+    // ===== HANDLE TRACKING (di landing page) =====
+    async function handleTracking() {
+        const noHp = document.getElementById('track-phone').value.trim();
+        if (!noHp) {
+            alert('Masukkan No HP!');
+            return;
+        }
 
-      const resultDiv = document.getElementById('tracking-result');
-      if (!resultDiv) return;
+        try {
+            const response = await fetch(`${CONFIG.GS_API_URL}?action=track-order&phone=${encodeURIComponent(noHp)}`);
+            const result = await response.json();
+            const resultDiv = document.getElementById('tracking-result');
 
-      if (result.success && result.orders && result.orders.length > 0) {
-        let html = '';
-        result.orders.forEach(order => {
-          const status = order.shippingStatus || 'DIKEMAS';
-          let step = 1;
-          if (status === 'DIKIRIM') step = 2;
-          else if (status === 'DITERIMA') step = 3;
+            if (!resultDiv) return;
 
-          html += `
-            <div class="tracking-item">
-              <p><strong>Order ID:</strong> ${order.orderId}</p>
-              <p><strong>Resi:</strong> ${order.cnoteNo || '-'}</p>
-              <p><strong>Kurir:</strong> ${order.courierChoice || '-'}</p>
-              <p><strong>Total:</strong> Rp ${(order.totalPrice || 0).toLocaleString()}</p>
-              <div class="tracking-progress">
-                <div class="tracking-step ${step >= 1 ? 'done' : ''}">
-                  <div class="step-icon"><i class="fas fa-box"></i></div>
-                  <span class="step-label">Dikemas</span>
-                </div>
-                <div class="tracking-step ${step >= 2 ? 'done' : ''}">
-                  <div class="step-icon"><i class="fas fa-truck"></i></div>
-                  <span class="step-label">Dikirim</span>
-                </div>
-                <div class="tracking-step ${step >= 3 ? 'done' : ''}">
-                  <div class="step-icon"><i class="fas fa-check-circle"></i></div>
-                  <span class="step-label">Diterima</span>
-                </div>
-              </div>
-            </div>
-          `;
-        });
-        resultDiv.innerHTML = html;
-        resultDiv.style.display = 'block';
-      } else {
-        resultDiv.innerHTML = `<p style="color:red;">${result.message || 'Pesanan tidak ditemukan'}</p>`;
-        resultDiv.style.display = 'block';
-      }
-    } catch (err) {
-      alert('Error: ' + err.message);
+            if (result.success && result.orders && result.orders.length > 0) {
+                let html = '';
+                result.orders.forEach(order => {
+                    let status = order.shippingStatus || 'DIKEMAS';
+                    let step = 1;
+                    if (status === 'DIKIRIM') step = 2;
+                    else if (status === 'DITERIMA') step = 3;
+                    else if (status === 'MENUNGGU_PEMBAYARAN') step = 0;
+
+                    html += `<div class="tracking-item">
+                        <p><strong>Order ID:</strong> ${order.orderId}</p>
+                        <p><strong>Resi:</strong> ${order.cnoteNo || '-'}</p>
+                        <p><strong>Kurir:</strong> ${order.courierChoice || '-'}</p>
+                        <p><strong>Total:</strong> Rp ${(order.totalPrice || 0).toLocaleString()}</p>
+                        <div class="tracking-progress">
+                            <div class="tracking-step ${step >= 1 ? 'done' : ''}">
+                                <div class="step-icon"><i class="fas fa-box"></i></div>
+                                <span class="step-label">Dikemas</span>
+                            </div>
+                            <div class="tracking-step ${step >= 2 ? 'done' : ''}">
+                                <div class="step-icon"><i class="fas fa-truck"></i></div>
+                                <span class="step-label">Dikirim</span>
+                            </div>
+                            <div class="tracking-step ${step >= 3 ? 'done' : ''}">
+                                <div class="step-icon"><i class="fas fa-check-circle"></i></div>
+                                <span class="step-label">Diterima</span>
+                            </div>
+                        </div>
+                        ${step === 0 ? '<p style="color:#e65100;font-weight:bold;">⏳ Menunggu Pembayaran</p>' : ''}
+                    </div>`;
+                });
+                resultDiv.innerHTML = html;
+                resultDiv.style.display = 'block';
+            } else {
+                resultDiv.innerHTML = `<p style="color:red;">${result.message || 'Pesanan tidak ditemukan'}</p>`;
+                resultDiv.style.display = 'block';
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
     }
-  }
 
-  // ============================================================
-  // START
-  // ============================================================
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+    // ===== COUNTDOWN =====
+    function startCountdown() {
+        let totalSeconds = 1800; // 30 menit
+
+        function updateTimer() {
+            if (totalSeconds <= 0) totalSeconds = 1800;
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            const timerEl = document.getElementById('countdown-timer');
+            if (timerEl) {
+                timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+            }
+            totalSeconds--;
+        }
+
+        updateTimer();
+        setInterval(updateTimer, 1000);
+    }
+
+    // ===== GIMMICKS =====
+    function startGimmicks() {
+        // Counter Terjual
+        let sold = 10234;
+        setInterval(() => {
+            sold += Math.floor(Math.random() * 5) + 1;
+            const counterEl = document.getElementById('sold-counter');
+            if (counterEl) counterEl.textContent = sold.toLocaleString() + '+';
+        }, 3000);
+
+        // Notifikasi Pembelian
+        const buyers = [
+            { name: 'Ahmad Fauzi', city: 'Bandung' },
+            { name: 'Dewi Sartika', city: 'Jakarta' },
+            { name: 'Budi Santoso', city: 'Surabaya' },
+            { name: 'Rina Anggraini', city: 'Medan' },
+            { name: 'Fajar Ramadhan', city: 'Makassar' },
+            { name: 'Nurul Hikmah', city: 'Yogyakarta' },
+            { name: 'Agus Salim', city: 'Semarang' },
+            { name: 'Siti Aisyah', city: 'Palembang' },
+            { name: 'Andi Pratama', city: 'Balikpapan' },
+            { name: 'Mega Lestari', city: 'Tangerang' },
+            { name: 'Rudi Hartono', city: 'Bogor' },
+            { name: 'Lisa Permata', city: 'Malang' },
+            { name: 'Doni Saputra', city: 'Pekanbaru' },
+            { name: 'Winda Sari', city: 'Denpasar' },
+            { name: 'Hendra Wijaya', city: 'Manado' },
+            { name: 'Rizky Amelia', city: 'Banjarmasin' },
+            { name: 'Gilang Nugroho', city: 'Pontianak' },
+            { name: 'Diana Putri', city: 'Jambi' },
+            { name: 'Eko Prasetyo', city: 'Lampung' },
+            { name: 'Maya Sari', city: 'Padang' },
+            { name: 'Irfan Hakim', city: 'Aceh' },
+            { name: 'Tiara Maharani', city: 'Kupang' },
+            { name: 'Arif Rahman', city: 'Jayapura' },
+            { name: 'Laila Fitria', city: 'Mataram' },
+            { name: 'Rizki Maulana', city: 'Sorong' },
+        ];
+
+        const timePhrases = ['baru saja', '1 menit lalu', '2 menit lalu', '3 menit lalu', '4 menit lalu', '5 menit lalu', '8 menit lalu', '10 menit lalu', '12 menit lalu', '15 menit lalu'];
+
+        function showRandomPurchaseNotif() {
+            const random = buyers[Math.floor(Math.random() * buyers.length)];
+            const time = timePhrases[Math.floor(Math.random() * timePhrases.length)];
+            const text = `${random.name} dari ${random.city} membeli produk ini ${time}`;
+            const popup = document.getElementById('notification-popup');
+            const notifText = document.getElementById('notif-text');
+            if (popup && notifText) {
+                notifText.textContent = text;
+                popup.style.display = 'block';
+                setTimeout(() => { popup.style.display = 'none'; }, 5000);
+            }
+        }
+
+        function scheduleNextNotif() {
+            const delay = Math.floor(Math.random() * 6000) + 4000;
+            setTimeout(() => {
+                showRandomPurchaseNotif();
+                scheduleNextNotif();
+            }, delay);
+        }
+
+        setTimeout(showRandomPurchaseNotif, 2000);
+        scheduleNextNotif();
+
+        // Trust Popup
+        const trustMessages = ['🔥 Stok Terbatas!', '💰 Garansi Uang Kembali 100%', '⭐ Ulasan 4.9/5', '📦 Pengiriman Cepat!', '✅ 100% Produk Asli'];
+        let trustIndex = 0;
+
+        function showTrustPopup() {
+            const popup = document.getElementById('trust-popup');
+            const content = document.getElementById('trust-content');
+            if (popup && content) {
+                content.innerHTML = '<i class="fas fa-check-circle" style="color:#25D366;"></i> ' +
+                    trustMessages[trustIndex % trustMessages.length];
+                popup.style.display = 'block';
+                setTimeout(() => { popup.style.display = 'none'; }, 4000);
+                trustIndex++;
+            }
+        }
+
+        setInterval(showTrustPopup, 10000);
+        setTimeout(showTrustPopup, 3000);
+    }
 
 })();
