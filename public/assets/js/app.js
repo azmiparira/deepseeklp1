@@ -9,7 +9,7 @@
 
     // ===== KONFIGURASI =====
     const CONFIG = {
-        GS_API_URL: window.GS_API_URL || 'https://script.google.com/macros/s/AKfycbzs2sIrux8crIhssdzUbTbbFp1hzpZlc6U_V2XkbgoYuszlXN730E4IbSSNwULiDYVe/exec',
+        GS_API_URL: window.GS_API_URL || 'https://script.google.com/macros/s/AKfycbxBUIV9mEdAX_LXbg_R3g7GMsWc8XErFsKPRKJtt32HBBm_VW687B5o6urHf59mjq75/exec',
         WA_ADMIN: '6281932696934',
         HARGA_PER_PCS: 209000,
         BERAT_PER_PCS: 0.15,
