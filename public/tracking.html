@@ -1,100 +1,56 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lacak Pesanan — Spray Tidur</title>
-    <link rel="stylesheet" href="./assets/css/style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Lacak Pesanan - Spray Tidur</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <link rel="stylesheet" href="./assets/css/style.css" />
     <link rel="icon" type="image/png" href="./assets/img/favicon.png" />
 </head>
 <body>
 
-<header class="main-header">
-    <div class="header-left">
-        <a href="./index.html" class="header-home"><i class="fas fa-home"></i> Beranda</a>
-    </div>
-    <div class="header-center">
-        <span class="header-brand">Spray Tidur</span>
-    </div>
-    <div class="header-right">
-        <a href="./index.html" class="header-track"><i class="fas fa-shopping-cart"></i> Belanja</a>
-    </div>
-</header>
+    <!-- ====== HEADER ====== -->
+    <header class="main-header">
+        <div class="header-left">
+            <a href="./index.html" class="header-home"><i class="fas fa-home"></i> Beranda</a>
+        </div>
+        <div class="header-center">
+            <span class="header-brand">Lacak Pesanan</span>
+        </div>
+        <div class="header-right">
+            <button id="btn-back-to-home" class="header-track"><i class="fas fa-arrow-left"></i> Kembali</button>
+        </div>
+    </header>
 
-<main>
-    <div class="container" style="padding-top:20px;">
+    <div class="container" style="padding-top: 20px;">
 
-        <!-- LAYAR 1: input nomor HP -->
-        <div class="card" id="search-card">
-            <h2 style="font-family:'Poppins',sans-serif; font-weight:700;">📦 Lacak Pesanan</h2>
-            <p style="color:#666; font-size:14px;">Masukkan nomor HP yang kamu pakai waktu checkout.</p>
-            <div class="track-search">
-                <input type="tel" id="phone-input" placeholder="08xxxxxxxxxx">
-                <button type="button" id="search-btn" class="btn-primary">Cari</button>
+        <!-- ===== SECTION TRACKING ===== -->
+        <section id="section-tracking" class="section active">
+            <div class="tracking-page">
+                <h2><i class="fas fa-map-pin"></i> Lacak Pesanan</h2>
+                <p style="color:#666; font-size:14px; margin-bottom:16px;">Masukkan nomor HP yang kamu gunakan saat checkout.</p>
+                <div class="tracking-form">
+                    <input type="tel" id="track-phone" placeholder="Masukkan No HP (contoh: 081234567890)" required />
+                    <button id="btn-track-submit" class="btn-primary"><i class="fas fa-search"></i> Cari</button>
+                </div>
+                <div id="tracking-result" class="tracking-result" style="display:none;"></div>
+                <button id="btn-back-home-track" class="btn-secondary" style="margin-top:16px;">Kembali ke Beranda</button>
             </div>
-            <div class="form-msg" id="search-msg"></div>
-        </div>
-
-        <!-- LAYAR 2: daftar pesanan -->
-        <div class="card" id="order-list-card" style="display:none;">
-            <h2 style="font-family:'Poppins',sans-serif; font-weight:700;">Pesanan Ditemukan</h2>
-            <p style="color:#666; font-size:14px;">Pilih salah satu pesanan untuk lihat detail statusnya.</p>
-            <div id="order-list"></div>
-            <button type="button" class="btn-secondary" id="back-to-search" style="margin-top:12px;">← Cari nomor lain</button>
-        </div>
-
-        <!-- LAYAR 3: detail status -->
-        <div id="detail-card" style="display:none;">
-            <div class="card">
-                <button type="button" class="btn-secondary" id="back-to-list" style="margin-top:0; margin-bottom:14px;">← Kembali ke daftar</button>
-                <h2 style="font-family:'Poppins',sans-serif; font-weight:700;">Status Pesanan</h2>
-                <p style="color:#666; font-size:14px;">Order ID: <strong id="d-order-id">-</strong></p>
-
-                <div id="waiting-payment-box" class="waiting-payment-box" style="display:none;">
-                    <div style="font-size:30px;">⏳</div>
-                    <div style="font-weight:700; font-size:16px; color:#A66A00;">Menunggu Pembayaran</div>
-                    <div style="font-size:13px; color:#666;">Pesanan akan langsung diproses & dikemas begitu pembayaranmu terkonfirmasi.</div>
-                </div>
-
-                <div id="timeline-box">
-                    <div class="tracking-progress" style="position:relative; display:flex; justify-content:space-between; margin:20px 0;">
-                        <div style="position:absolute; top:50%; left:10%; right:10%; height:3px; background:#ddd; transform:translateY(-50%); z-index:0;"></div>
-                        <div id="tl-progress" style="position:absolute; top:50%; left:10%; height:3px; background:#4CAF50; z-index:1; transition:width 0.4s; width:0%;"></div>
-                        <div class="tl-step" id="tl-step-1" style="z-index:2; text-align:center;">
-                            <div style="width:36px; height:36px; border-radius:50%; background:#fff; border:3px solid #ddd; margin:0 auto; display:flex; align-items:center; justify-content:center;">📦</div>
-                            <div style="font-size:11px; font-weight:600; margin-top:4px;">Dikemas</div>
-                        </div>
-                        <div class="tl-step" id="tl-step-2" style="z-index:2; text-align:center;">
-                            <div style="width:36px; height:36px; border-radius:50%; background:#fff; border:3px solid #ddd; margin:0 auto; display:flex; align-items:center; justify-content:center;">🚚</div>
-                            <div style="font-size:11px; font-weight:600; margin-top:4px;">Dikirim</div>
-                        </div>
-                        <div class="tl-step" id="tl-step-3" style="z-index:2; text-align:center;">
-                            <div style="width:36px; height:36px; border-radius:50%; background:#fff; border:3px solid #ddd; margin:0 auto; display:flex; align-items:center; justify-content:center;">🏠</div>
-                            <div style="font-size:11px; font-weight:600; margin-top:4px;">Diterima</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="text-align:center; background:#E9F9EE; border-radius:12px; padding:16px; margin:16px 0;">
-                    <div style="font-size:11px; text-transform:uppercase; color:#666;">Nomor Resi</div>
-                    <div style="font-family:'Courier New',monospace; font-weight:800; font-size:18px;" id="d-resi">-</div>
-                </div>
-
-                <div class="summary-row"><span id="d-product">-</span><span id="d-total">-</span></div>
-                <div class="summary-row"><span>Metode Bayar</span><span id="d-payment">-</span></div>
-
-                <a href="#" id="d-wa-btn" class="btn-success" style="display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; margin-top:12px;">
-                    <i class="fab fa-whatsapp"></i> Chat Admin soal Pesanan Ini
-                </a>
-            </div>
-        </div>
+        </section>
 
     </div>
-</main>
 
-<script>
-    window.GS_API_URL = 'https://script.google.com/macros/s/AKfycbzs2sIrux8crIhssdzUbTbbFp1hzpZlc6U_V2XkbgoYuszlXN730E4IbSSNwULiDYVe/exec'; // GANTI
-</script>
-<script src="./assets/js/tracking.js"></script>
+    <footer class="sticky-footer" style="position:relative; margin-top:30px;">
+        <div style="text-align:center; font-size:12px; color:#999; padding:8px 0;">
+            © 2026 Spray Tidur — All rights reserved
+        </div>
+    </footer>
+
+    <script>
+        window.GS_API_URL = 'https://script.google.com/macros/s/AKfycbzs2sIrux8crIhssdzUbTbbFp1hzpZlc6U_V2XkbgoYuszlXN730E4IbSSNwULiDYVe/exec';
+    </script>
+    <script src="./assets/js/tracking.js"></script>
 </body>
 </html>
